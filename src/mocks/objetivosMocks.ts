@@ -551,37 +551,92 @@ function seedFromId(id: string): number {
   return [...id].reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 7);
 }
 
+/** How many people a cycle is staffed with, independent of its objective count. */
+const MIN_ROSTER_SIZE = 18;
+const MAX_ROSTER_SIZE = 34;
+
+/**
+ * People assigned to the cycle who have not created their objectives yet.
+ *
+ * Being on a cycle and not having written your objectives is an ordinary state —
+ * it is exactly what "Por iniciar" means, and what the "Crear objetivo" action
+ * exists for. Modelling it also decouples roster size from `objectivesCount`,
+ * so a cycle with five objectives still shows a realistically staffed team
+ * instead of five rows and a band of empty card.
+ */
+function buildPendingMembers(
+  cycle: ObjectiveCycleItem,
+  random: () => number,
+  count: number,
+  startNumber: number
+): AssignedUser[] {
+  return Array.from({ length: count }, (_unused, index) => {
+    const number = startNumber + index;
+    const firstName = pick(random, FIRST_NAMES);
+    const lastName = pick(random, LAST_NAMES);
+    const username = `${firstName.toLowerCase()}.${stripAccents(lastName.toLowerCase())}${number}`;
+
+    return {
+      id: `${cycle.id}-asg-${number.toString().padStart(2, '0')}`,
+      username,
+      name: `${firstName} ${lastName}`,
+      email: `${username}@example.co`,
+      status: 'Por iniciar',
+      objectivesCount: 0,
+      weightPercent: 0,
+      progress: 0,
+      completedProgress: 0,
+      performance: 'Por mejorar',
+    } satisfies AssignedUser;
+  });
+}
+
 /**
  * Builds the roster for a cycle. Objective counts are distributed so they sum to
  * the cycle's own `objectivesCount`, and weights sum to 100 — otherwise the
  * detail view would contradict the number the list already showed for that row.
+ * Anyone beyond the number of objectives to go round joins as a pending member.
  * A cycle with no objectives has no assigned users, which is what makes the
  * empty state reachable.
  */
 export function getAssignedUsers(cycle: ObjectiveCycleItem): AssignedUser[] {
-  if (cycle.id === SEEDED_CYCLES[0]?.id) return SEEDED_ASSIGNED_USERS;
   if (cycle.objectivesCount === 0) return [];
 
   const random = createRandom(seedFromId(cycle.id));
-  // Between 10 and 34 people, never more than there are objectives to go round —
-  // every user needs at least one. Rosters this size are both closer to how a
-  // real cycle is staffed and enough to fill the table instead of leaving a
-  // band of empty card under three or four rows.
-  const userCount = Math.max(1, Math.min(cycle.objectivesCount, 10 + Math.floor(random() * 25)));
+  const rosterSize =
+    MIN_ROSTER_SIZE + Math.floor(random() * (MAX_ROSTER_SIZE - MIN_ROSTER_SIZE + 1));
+
+  // The first cycle keeps the exact roster the product shows today; the rest of
+  // its team joins as pending members so the table still fills out.
+  if (cycle.id === SEEDED_CYCLES[0]?.id) {
+    return [
+      ...SEEDED_ASSIGNED_USERS,
+      ...buildPendingMembers(
+        cycle,
+        random,
+        Math.max(0, rosterSize - SEEDED_ASSIGNED_USERS.length),
+        SEEDED_ASSIGNED_USERS.length + 1
+      ),
+    ];
+  }
+
+  // Only as many people as there are objectives can hold one; the remainder of
+  // the roster is staffed but hasn't started.
+  const contributorCount = Math.min(cycle.objectivesCount, rosterSize);
 
   // Raw shares, normalised afterwards so both columns total what they should.
-  const shares = Array.from({ length: userCount }, () => 0.2 + random());
+  const shares = Array.from({ length: contributorCount }, () => 0.2 + random());
   const sharesTotal = shares.reduce((total, share) => total + share, 0);
 
   let objectivesLeft = cycle.objectivesCount;
   let weightLeft = 100;
 
-  return shares.map((share, index) => {
-    const isLast = index === userCount - 1;
+  const contributors = shares.map((share, index) => {
+    const isLast = index === contributorCount - 1;
     // The last row absorbs the rounding remainder so the totals stay exact.
     const objectivesCount = isLast
       ? objectivesLeft
-      : Math.max(1, Math.min(objectivesLeft - (userCount - index - 1), Math.round((share / sharesTotal) * cycle.objectivesCount)));
+      : Math.max(1, Math.min(objectivesLeft - (contributorCount - index - 1), Math.round((share / sharesTotal) * cycle.objectivesCount)));
     const weightPercent = isLast
       ? Math.round(weightLeft * 100) / 100
       : Math.round((share / sharesTotal) * 100 * 100) / 100;
@@ -616,4 +671,9 @@ export function getAssignedUsers(cycle: ObjectiveCycleItem): AssignedUser[] {
       performance: getPerformanceLevel(progress),
     } satisfies AssignedUser;
   });
+
+  return [
+    ...contributors,
+    ...buildPendingMembers(cycle, random, rosterSize - contributorCount, contributorCount + 1),
+  ];
 }
