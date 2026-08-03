@@ -25,7 +25,10 @@ export const InlineSearch: React.FC<{
   /** Announced label for the collapsed trigger. */
   label: string;
 }> = ({ value, onValueChange, placeholder, label }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
+  // Starts expanded when a query is already in play. The list would otherwise
+  // come back from a detail view still filtered but with the box collapsed,
+  // leaving no visible reason why only some rows are showing.
+  const [isOpen, setIsOpen] = React.useState(() => value !== "");
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {

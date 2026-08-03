@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/feedback/EmptyState";
+import { useShellChrome } from "@/components/layout";
 import { CicloDetalleDashboard } from "@/screens/CicloDetalleDashboard";
 import {
   CycleProgressBar,
@@ -111,6 +112,7 @@ export const CiclosObjetivosDashboard: React.FC = () => {
   // the shell so the list's own search, filters and page survive a round trip
   // into a cycle and back out.
   const [openCycle, setOpenCycle] = React.useState<ObjectiveCycleItem | null>(null);
+  const { setChromeHidden } = useShellChrome();
   const [searchQuery, setSearchQuery] = React.useState("");
   const [periodFilters, setPeriodFilters] = React.useState<string[]>([]);
   const [statusFilters, setStatusFilters] = React.useState<string[]>([]);
@@ -119,6 +121,10 @@ export const CiclosObjetivosDashboard: React.FC = () => {
   // the mock) so refreshing genuinely re-reads its source, the way a refetch
   // would once this is wired to the API.
   const [cycles, setCycles] = React.useState<ObjectiveCycleItem[]>(OBJECTIVE_CYCLES);
+
+  // Safety net: with the tabs hidden there is no way out but the back button, so
+  // unmounting mid-detail would leave the shell stranded without navigation.
+  React.useEffect(() => () => setChromeHidden(false), [setChromeHidden]);
 
   const filteredCycles = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -154,8 +160,23 @@ export const CiclosObjetivosDashboard: React.FC = () => {
     toast.success("Lista de ciclos actualizada");
   };
 
+  /**
+   * Opening a cycle hands the whole content area to its detail, so the section
+   * tabs and actions go with it. Both state changes happen in the same handler —
+   * no effect, no extra render pass.
+   */
+  const openCycleDetail = (cycle: ObjectiveCycleItem) => {
+    setOpenCycle(cycle);
+    setChromeHidden(true);
+  };
+
+  const closeCycleDetail = () => {
+    setOpenCycle(null);
+    setChromeHidden(false);
+  };
+
   if (openCycle) {
-    return <CicloDetalleDashboard cycle={openCycle} onBack={() => setOpenCycle(null)} />;
+    return <CicloDetalleDashboard cycle={openCycle} onBack={closeCycleDetail} />;
   }
 
   return (
@@ -272,7 +293,7 @@ export const CiclosObjetivosDashboard: React.FC = () => {
                 <TableCell className="py-4 px-8 max-w-[280px]">
                   <button
                     type="button"
-                    onClick={() => setOpenCycle(cycle)}
+                    onClick={() => openCycleDetail(cycle)}
                     className="text-left text-[12px] font-bold text-text-primary line-clamp-2 rounded-sm transition-colors hover:text-primary hover:underline decoration-primary/40 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
                     {cycle.name}
@@ -310,7 +331,7 @@ export const CiclosObjetivosDashboard: React.FC = () => {
                   {formatProgress(cycle.progress)}
                 </TableCell>
                 <TableCell className="text-right pr-8">
-                  <CycleRowActions cycle={cycle} onOpen={() => setOpenCycle(cycle)} />
+                  <CycleRowActions cycle={cycle} onOpen={() => openCycleDetail(cycle)} />
                 </TableCell>
               </TableRow>
             ))}
