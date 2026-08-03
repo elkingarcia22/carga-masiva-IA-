@@ -7,8 +7,11 @@ import {
   FileSearch,
   FileText,
   Info,
+  Pencil,
+  Plus,
   Sparkles,
   Target,
+  TrendingUp,
   Upload,
   Users,
 } from "lucide-react";
@@ -22,11 +25,13 @@ import { DrawerShell } from "@/components/overlays/DrawerShell";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { UploadZone } from "@/components/upload/UploadZone";
 import {
+  BULK_UPLOAD_MODES,
   OBJECTIVES_IMPORT_ACCEPT,
   OBJECTIVES_IMPORT_MAX_MB,
-  OBJECTIVES_TEMPLATE_COLUMNS,
   analyzeObjectivesFiles,
   getImmediateValidationError,
+  getModeConfig,
+  type BulkUploadMode,
   type DetectedObjectivesAnalysis,
 } from "@/lib/objectivesImport";
 
@@ -66,6 +71,80 @@ function getAnalyzingCopy(progress: number, filesCount: number): { status: strin
   return { status: "Finalizando análisis..." };
 }
 
+/** Icon per operation, kept next to the drawer rather than in the data module. */
+const MODE_ICON: Record<BulkUploadMode, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
+  crear: Plus,
+  editar: Pencil,
+  actualizar: TrendingUp,
+};
+
+/**
+ * One of the three operations, picked before anything is uploaded.
+ *
+ * The choice is made first because it changes what the file must contain —
+ * creating needs a user to assign to, editing and updating need objective ids —
+ * so showing the dropzone before it is settled would invite the wrong file.
+ */
+const ModeCard: React.FC<{
+  mode: BulkUploadMode;
+  label: string;
+  description: string;
+  selected: boolean;
+  onSelect: () => void;
+}> = ({ mode, label, description, selected, onSelect }) => {
+  const Icon = MODE_ICON[mode];
+
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        "w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all duration-300",
+        selected
+          ? "border-primary bg-surface shadow-sm"
+          : "border-border/40 bg-surface hover:border-border-strong/40"
+      )}
+    >
+      <div
+        className={cn(
+          "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-all duration-300",
+          selected ? "bg-primary text-text-inverse shadow-md shadow-primary/20" : "bg-surface-muted text-text-secondary/40"
+        )}
+      >
+        <Icon className="h-4 w-4" strokeWidth={2.5} />
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p
+          className={cn(
+            "text-[13px] font-bold tracking-tight mb-0.5",
+            selected ? "text-primary" : "text-text-primary"
+          )}
+        >
+          {label}
+        </p>
+        <p className="text-[11px] text-text-secondary/60 font-medium leading-snug">{description}</p>
+      </div>
+
+      <div
+        className={cn(
+          "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-300",
+          selected ? "border-primary" : "border-border-strong/40 bg-surface-muted"
+        )}
+      >
+        <div
+          className={cn(
+            "h-2.5 w-2.5 rounded-full bg-primary transition-all duration-300",
+            selected ? "scale-100 opacity-100" : "scale-0 opacity-0"
+          )}
+        />
+      </div>
+    </button>
+  );
+};
+
 /** One headline number in the summary. */
 const SummaryStat: React.FC<{
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
@@ -103,19 +182,34 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 }) => {
   const [tab, setTab] = React.useState<'nueva' | 'cargas'>('nueva');
   const [step, setStep] = React.useState<UploadStep>('dropzone');
+  const [mode, setMode] = React.useState<BulkUploadMode>('crear');
   const [files, setFiles] = React.useState<File[]>([]);
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [progress, setProgress] = React.useState(0);
   const [analysis, setAnalysis] = React.useState<DetectedObjectivesAnalysis | null>(null);
   const [error, setError] = React.useState<{ title: string; detail: string } | null>(null);
 
+  const modeConfig = getModeConfig(mode);
+
   const reset = () => {
     setStep('dropzone');
+    setMode('crear');
     setFiles([]);
     setIsAnalyzing(false);
     setProgress(0);
     setAnalysis(null);
     setError(null);
+  };
+
+  /**
+   * Switching operation invalidates the picked file: each one expects different
+   * columns, so keeping the previous selection would let the user analyse a
+   * "crear" file as if it were an "actualizar" one.
+   */
+  const handleModeChange = (next: BulkUploadMode) => {
+    if (next === mode) return;
+    setMode(next);
+    setFiles([]);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -143,7 +237,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 
   const handleAnalyze = () => {
     void runWithProgress(async () => {
-      const outcome = await analyzeObjectivesFiles(files, rosterIdentifiers);
+      const outcome = await analyzeObjectivesFiles(files, mode, rosterIdentifiers);
 
       if (outcome.kind === 'error') {
         setError({ title: outcome.title, detail: outcome.detail });
@@ -164,30 +258,37 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
   };
 
   const handleConfirm = () => {
-    const total = analysis?.rows.length ?? 0;
+    // Unresolved rows are skipped when editing or updating, so the number
+    // reported has to be what actually lands — not the row count of the file.
+    const applied =
+      mode === 'crear'
+        ? (analysis?.rows.length ?? 0)
+        : (analysis?.rows.filter((row) => row.isResolved).length ?? 0);
+    const verb = mode === 'crear' ? 'cargados' : mode === 'editar' ? 'editados' : 'actualizados';
+
     setStep('loading');
     void runWithProgress(async () => {
       await new Promise((resolve) => setTimeout(resolve, 900));
     }).then(() => {
-      toast.success(`${total} objetivos cargados en "${cycleName}"`);
-      onUploaded?.(total);
+      toast.success(`${applied} objetivos ${verb} en "${cycleName}"`);
+      onUploaded?.(applied);
       handleOpenChange(false);
     });
   };
 
   const title =
     step === 'summary' ? "Revisa lo que detectamos"
-    : step === 'loading' ? "Cargando objetivos"
+    : step === 'loading' ? `${modeConfig.label}...`
     : step === 'error' ? "No pudimos continuar"
     : step === 'empty' ? "No encontramos objetivos"
     : "Carga masiva de objetivos";
 
   const description =
-    step === 'summary' ? "Verifica la información antes de cargarla al ciclo."
-    : step === 'loading' ? "Estamos guardando los objetivos en el ciclo."
+    step === 'summary' ? "Verifica la información antes de aplicarla al ciclo."
+    : step === 'loading' ? "Estamos guardando los cambios en el ciclo."
     : step === 'error' ? "Revisa el archivo e inténtalo de nuevo."
     : step === 'empty' ? "No pudimos detectar objetivos en este archivo."
-    : "Sube un archivo con los objetivos o revisa tus cargas recientes.";
+    : "Elige qué quieres hacer y sube el archivo, o revisa tus cargas recientes.";
 
   return (
     <DrawerShell
@@ -229,7 +330,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                   className="flex-1 gap-2.5 h-11 text-xs font-bold tracking-tight shadow-lg shadow-primary/20 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.98]"
                 >
                   <Upload className="h-4 w-4" />
-                  <span>Cargar objetivos</span>
+                  <span>{modeConfig.confirmLabel}</span>
                 </Button>
               )}
 
@@ -315,17 +416,32 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 
           <TabsContent value="nueva" className="flex-1 min-h-0 overflow-y-auto mt-0 focus-visible:outline-none">
             <div className="flex flex-col gap-4">
+              <div role="radiogroup" aria-label="Qué quieres hacer" className="space-y-2">
+                <p className="text-[11px] font-bold text-text-secondary/40 uppercase tracking-widest px-1">
+                  Qué quieres hacer
+                </p>
+                {BULK_UPLOAD_MODES.map((entry) => (
+                  <ModeCard
+                    key={entry.id}
+                    mode={entry.id}
+                    label={entry.label}
+                    description={entry.description}
+                    selected={entry.id === mode}
+                    onSelect={() => handleModeChange(entry.id)}
+                  />
+                ))}
+              </div>
+
               <div className="rounded-xl border border-border/40 bg-surface-subtle/60 p-4 space-y-2.5">
                 <div className="flex items-start gap-2">
                   <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-xs text-text-secondary/80 leading-relaxed">
-                    Los objetivos se cargarán en{" "}
-                    <span className="font-bold text-text-primary">{cycleName}</span>. Tu archivo debe
-                    incluir estas columnas:
+                    En <span className="font-bold text-text-primary">{cycleName}</span>:{" "}
+                    {modeConfig.intent} Tu archivo debe incluir estas columnas:
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pl-6">
-                  {OBJECTIVES_TEMPLATE_COLUMNS.map((label) => (
+                  {modeConfig.columns.map((label) => (
                     <span
                       key={label}
                       className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-surface-muted text-text-secondary"
@@ -337,11 +453,11 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                 <div className="pl-6 pt-1">
                   <button
                     type="button"
-                    onClick={() => toast.info("Descargando plantilla de objetivos")}
+                    onClick={() => toast.info(`Descargando plantilla · ${modeConfig.label}`)}
                     className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary hover:underline"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    Descargar plantilla
+                    Descargar plantilla de {modeConfig.label.toLowerCase()}
                   </button>
                 </div>
               </div>
@@ -403,8 +519,28 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
       {step === 'summary' && analysis && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-2.5">
-            <SummaryStat icon={Target} label="Objetivos detectados" value={String(analysis.rows.length)} />
-            <SummaryStat icon={Users} label="Usuarios involucrados" value={String(analysis.userCount)} />
+            <SummaryStat
+              icon={Target}
+              label={
+                mode === 'crear'
+                  ? "Objetivos a crear"
+                  : mode === 'editar'
+                    ? "Objetivos a editar"
+                    : "Objetivos a actualizar"
+              }
+              // Editing and updating skip what they cannot resolve, so the
+              // headline has to count what will actually be applied.
+              value={String(
+                mode === 'crear'
+                  ? analysis.rows.length
+                  : analysis.rows.filter((row) => row.isResolved).length
+              )}
+            />
+            <SummaryStat
+              icon={Users}
+              label={mode === 'crear' ? "Usuarios involucrados" : "Filas que se omiten"}
+              value={String(mode === 'crear' ? analysis.userCount : analysis.unresolvedCount)}
+            />
           </div>
 
           {analysis.warnings.map((warning) => (
@@ -423,7 +559,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
           <div className="rounded-xl border border-border/50 bg-surface overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
               <span className="text-[11px] font-bold text-text-secondary/40 uppercase tracking-widest">
-                Objetivos a crear
+                {modeConfig.rowsHeading}
               </span>
               <span className="text-[11px] font-bold text-text-secondary/60 tabular-nums">
                 {analysis.rows.length}
@@ -445,9 +581,11 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                         {row.identifier}
                       </span>
                       <span className="text-[11px] text-text-secondary/60 font-medium tabular-nums">
-                        Peso {row.weightPercent}%
+                        {row.progressPercent != null
+                          ? `Avance ${row.progressPercent}%`
+                          : `Peso ${row.weightPercent}%`}
                       </span>
-                      {!row.isKnownUser && (
+                      {!row.isResolved && (
                         <span
                           className={cn(
                             "px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-1",
@@ -455,7 +593,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                           )}
                         >
                           <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
-                          Nuevo en el ciclo
+                          {modeConfig.unresolvedLabel}
                         </span>
                       )}
                     </div>
