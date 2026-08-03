@@ -1,0 +1,91 @@
+:root {
+  /* --- UBITS Brand Tokens (Figma Exact HEX) --- */
+  --color-brand: #0C5BEF;
+  --color-brand-hover: #1e4abf;
+  --color-brand-pressed: #223a91;
+  
+  /* Surfaces */
+  --color-bg-app: #f8faff;
+  --color-surface: #ffffff;
+  --color-surface-nav: #111827;
+  --color-surface-muted: #f0f4ff;
+  --color-surface-subtle: #fbfcfe;
+  
+  /* Typography (Figma Exact HEX) */
+  --color-text-primary: #303A47;   /* Títulos */
+  --color-text-secondary: #5C646F; /* Subtítulos y Cuerpo */
+  --color-text-muted: #979ba3;
+  --color-text-inverse: #ffffff;
+  
+  /* Borders */
+  --color-border: #D0D2D5;
+  --color-border-strong: #979ba3;
+  
+  /* States (Figma Update) */
+  --color-positive: #328E2C;
+  --color-positive-dark: #223B16;
+  --color-positive-bg: #E8F8E4;
+  
+  --color-negative: #E9343C;
+  
+  --color-warning: #FF7B0D;
+  --color-warning-light: #FFB37F;
+  
+  --color-info: #4A74EE;
+  
+  /* AI Features */
+  --color-ai-bg: #f3f2ff;
+  --color-ai-border: #97a5fd;
+  --color-ai-gradient-start: #2d5cf7;
+  --color-ai-gradient-end: #e11d48;
+  --color-ai-gradient-start-hsl: 226 92% 57%;
+  --color-ai-gradient-end-hsl: 347 77% 50%;
+  --shadow-ai-premium: 0 4px 15px rgba(45, 92, 247, 0.3), 0 2px 5px rgba(225, 29, 72, 0.2);
+
+  /* AI Multi-stop Gradient (full-screen loaders, premium overlays) */
+  --color-ai-stop-1: #0c5bef;
+  --color-ai-stop-2: #8823ea;
+  --color-ai-stop-3: #ea066f;
+  --color-ai-stop-4: #ea066f;
+  --color-ai-stop-5: #ff5416;
+  --color-ai-stop-1-rgb: 12, 91, 239;
+  --color-ai-stop-2-rgb: 136, 35, 234;
+  --color-ai-stop-3-rgb: 234, 6, 111;
+  --color-ai-stop-4-rgb: 234, 6, 111;
+  --color-ai-stop-5-rgb: 255, 84, 22;
+  
+  /* Radius — UBITS app uses generous rounding */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03), 0 2px 6px rgba(15, 23, 42, 0.02);
+  --shadow-drawer: 0 4px 16px rgba(15, 23, 42, 0.12), 0 1px 4px rgba(15, 23, 42, 0.05);
+  --shadow-premium: 0 20px 50px rgba(0, 0, 0, 0.05), 0 10px 20px rgba(0, 0, 0, 0.02);
+  
+  /* Fonts */
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* --- HSL Channels for Opacity Support (Calculated from HEX) --- */
+  --color-brand-hsl: 219 90% 49%;
+  --color-bg-app-hsl: 225 100% 98.5%;
+  --color-surface-hsl: 0 0% 100%;
+  --color-text-primary-hsl: 214 19% 23%;
+  --color-text-secondary-hsl: 214 10% 40%;
+  --color-text-inverse-hsl: 0 0% 100%;
+  --color-border-hsl: 210 4% 82%;
+  --color-negative-hsl: 357 80% 56%;
+  --color-positive-hsl: 116 53% 37%;
+  --color-positive-dark-hsl: 100 45% 16%;
+  --color-positive-bg-hsl: 108 55% 93%;
+  --color-warning-hsl: 27 100% 52%;
+  --color-warning-light-hsl: 24 100% 75%;
+  --color-info-hsl: 225 83% 61%;
+  --color-surface-muted-hsl: 225 100% 97%;
+  --color-surface-subtle-hsl: 225 100% 99%;
+  --color-surface-nav-hsl: 222 47% 11%;
+}

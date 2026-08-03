@@ -1,0 +1,322 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Custom Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(220 14% 30%);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(220 10% 45%);
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+.dark * {
+  scrollbar-color: hsl(220 14% 30%) transparent;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-none;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+    font-feature-settings: "cv05", "cv08", "cv11", "ss01";
+    letter-spacing: -0.011em;
+  }
+
+  /* ── Typography Scale (UBITS Premium) ──────────────────── */
+  h1 { @apply text-2xl font-bold tracking-tight text-text-primary; }
+  h2 { @apply text-xl font-bold tracking-tight text-text-primary; }
+  h3 { @apply text-lg font-semibold tracking-tight text-text-primary; }
+  h4 { @apply text-base font-semibold tracking-tight text-text-primary; }
+  h5 { @apply text-sm font-semibold tracking-tight text-text-primary; }
+  h6 { @apply text-xs font-semibold text-text-secondary; }
+  
+  /* Compact weights for high-density UI */
+  .font-black { font-weight: 700; letter-spacing: -0.01em; }
+  .font-extrabold { font-weight: 600; letter-spacing: -0.01em; }
+  .font-bold { font-weight: 700; letter-spacing: -0.01em; }
+
+  p, span, div {
+    @apply leading-relaxed;
+  }
+
+  /* ── Icons — thinner stroke to match UBITS style ────────── */
+  svg.lucide,
+  [data-slot] svg,
+  button svg,
+  a svg {
+    stroke-width: 1.75;
+  }
+
+  :root {
+    /* Mapeo de variables shadcn a tokens oficiales UBITS (usando canales HSL para soporte de opacidad) */
+    --background: var(--color-bg-app-hsl);
+    --foreground: var(--color-text-primary-hsl);
+    
+    --card: var(--color-surface-hsl);
+    --card-foreground: var(--color-text-primary-hsl);
+    
+    --popover: var(--color-surface-hsl);
+    --popover-foreground: var(--color-text-primary-hsl);
+    
+    --primary: var(--color-brand-hsl);
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: var(--color-surface-muted-hsl);
+    --secondary-foreground: var(--color-text-primary-hsl);
+    
+    --muted: var(--color-surface-muted-hsl);
+    --muted-foreground: var(--color-text-secondary-hsl);
+    
+    --accent: 217 28% 90%; /* #dce4f0 — blue-tinted hover, coherente con bg-app azulado */
+    --accent-foreground: var(--color-text-primary-hsl);
+    
+    --destructive: var(--color-negative-hsl);
+    --destructive-foreground: 0 0% 100%;
+
+    --info: var(--color-info-hsl);
+    --info-foreground: 0 0% 100%;
+
+    --warning: var(--color-warning-hsl);
+    --warning-foreground: 0 0% 100%;
+
+    --success: var(--color-positive-hsl);
+    --success-foreground: 0 0% 100%;
+
+    --nav: 222 47% 11%;
+    --nav-foreground: 0 0% 100%;
+
+    --border: var(--color-border-hsl);
+    --input: var(--color-border-hsl);
+    --ring: var(--color-brand-hsl);
+    
+    --radius: var(--radius-md);
+
+    /* AI Premium Tokens */
+    --ai-gradient-start: var(--color-ai-gradient-start-hsl);
+    --ai-gradient-end: var(--color-ai-gradient-end-hsl);
+  }
+
+  .dark {
+    /* ── Overrides de tokens UBITS directos (text-text-*, bg-surface-*) ── */
+    /* Sin esto, clases como text-text-secondary quedan oscuras sobre fondo oscuro */
+    --color-text-primary: #edeeef;    /* ubits-fg-1-high dark */
+    --color-text-secondary: #9aa0aa;  /* ubits fg-1-medium dark, paso intermedio */
+    --color-text-muted: #6b7480;      /* reducido para hint/placeholder */
+    --color-text-inverse: #303a47;
+    --color-bg-app: #0c1120;          /* Deep Navy Base (Kept for Harmony) */
+    --color-surface: #161e2f;         /* Elevated Card Surface (Kept for Harmony) */
+    --color-surface-muted: #212d40;   /* Muted Section (Kept for Harmony) */
+    /* recessed, más oscuro que card */
+    --color-surface-subtle: #0f172a;
+    --color-border: #3d4555;
+    --color-border-strong: #4f5561;
+
+    /* ── Superficies ─────────────────────────────────────── */
+    /* #0c1120 — pantalla base */
+    --background: 222 45% 9%;
+    /* #edeeef — texto principal */
+    --foreground: 210 6% 93%;
+
+    /* #161e2f — contenedores/cards */
+    --card: 222 36% 14%;
+    --card-foreground: 210 6% 93%;
+
+    /* #1c253d — popovers/dropdowns */
+    --popover: 224 37% 17%;
+    --popover-foreground: 210 6% 93%;
+
+    /* ── Primario ─────────────────────────────────────────── */
+    /* #3865f5 — azul UBITS brillante en dark */
+    --primary: 222 91% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    /* ── Secundario / Muted / Accent ─────────────────────── */
+    /* #212d40 — superficie secundaria */
+    --secondary: 217 31% 19%;
+    --secondary-foreground: 210 6% 93%;
+
+    /* #0f172a — superficie muted */
+    --muted: 222 47% 11%;
+    /* #8d9299 — texto secundario/placeholder */
+    --muted-foreground: 220 4% 57%;
+
+    /* #2a3449 — hover/active */
+    --accent: 222 47% 20%;
+    --accent-foreground: 210 6% 93%;
+
+    /* ── Warning ──────────────────────────────────────────── */
+    --warning: 38 94% 58%; /* Increased lightness for better contrast in dark mode */
+    --warning-foreground: 207 14% 15%; /* Dark text for orange background */
+
+    /* ── Destructive ──────────────────────────────────────── */
+    --destructive: 357 72% 55%; /* Lighter red for dark mode visibility */
+    --destructive-foreground: 0 0% 100%;
+
+    /* ── Bordes e Inputs ──────────────────────────────────── */
+    /* #3d4555 — border sutil */
+    --border: 221 16% 29%;
+    /* #404754 — input border */
+    --input: 221 14% 28%;
+    --ring: 222 91% 58%;
+    --nav: 222 47% 11%;
+    --nav-foreground: 0 0% 100%;
+  }
+
+  .bg-nav {
+    background-color: hsl(222 47% 11%) !important;
+  }
+  
+  .text-nav-foreground {
+    color: hsl(0 0% 100%) !important;
+  }
+
+  .ubits-premium-sidebar-rail {
+    background-color: hsl(222 47% 11%) !important;
+  }
+
+  /* AI Premium Utilities */
+  .bg-ai-gradient {
+    background: linear-gradient(135deg, hsl(var(--ai-gradient-start)) 0%, hsl(var(--ai-gradient-end)) 100%) !important;
+  }
+
+  .text-ai-gradient {
+    background: linear-gradient(135deg, hsl(var(--ai-gradient-start)) 0%, hsl(var(--ai-gradient-end)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .border-ai-gradient {
+    border: 1px solid transparent !important;
+    background: linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box,
+                linear-gradient(135deg, hsl(var(--ai-gradient-start)), hsl(var(--ai-gradient-end))) border-box !important;
+  }
+
+  .shadow-ai-premium {
+    box-shadow: var(--shadow-ai-premium) !important;
+  }
+
+  .bg-ai-fuzzy-overlay {
+    background: linear-gradient(135deg, rgba(var(--color-ai-stop-1-rgb), 0.72) 0%, rgba(var(--color-ai-stop-2-rgb), 0.72) 35%, rgba(var(--color-ai-stop-3-rgb), 0.72) 65%, rgba(var(--color-ai-stop-5-rgb), 0.72) 100%) !important;
+    backdrop-filter: blur(16px) !important;
+  }
+
+  .shimmer-mirror {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer-mirror::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.25) 30%,
+      rgba(255, 255, 255, 0.55) 50%,
+      rgba(255, 255, 255, 0.25) 70%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: translateX(-120%) skewX(-22deg);
+    animation: mirror-shimmer-anim 3.5s infinite ease-in-out;
+    pointer-events: none;
+  }
+
+  @keyframes mirror-shimmer-anim {
+    0% {
+      transform: translateX(-120%) skewX(-22deg);
+    }
+    45% {
+      transform: translateX(120%) skewX(-22deg);
+    }
+    100% {
+      transform: translateX(120%) skewX(-22deg);
+    }
+  }
+
+  /* ── Tooltip & UI Inverse Surfaces ─────────────────────── */
+  .bg-surface-inverse {
+    background-color: #111827 !important; /* Deep Navy (UBITS Dark) */
+  }
+
+  .text-text-inverse {
+    color: #ffffff !important;
+  }
+
+  /* Premium Glassmorphism for Tooltips */
+  [data-radix-popper-content-wrapper] {
+    z-index: 9999 !important;
+  }
+
+  .tooltip-premium {
+    @apply backdrop-blur-xl border border-white/20 shadow-2xl px-4 py-3 rounded-xl text-[12px] font-semibold tracking-tight;
+    background: linear-gradient(135deg, rgba(17, 24, 39, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 15px 35px -12px rgba(0, 0, 0, 0.6) !important;
+    max-width: 320px !important;
+    min-width: 160px;
+    white-space: normal !important;
+    line-height: 1.5 !important;
+    animation: tooltip-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Match arrow with premium background */
+  .tooltip-premium [data-slot="tooltip-arrow"] {
+    fill: #111827 !important;
+    background-color: #111827 !important;
+  }
+
+  /* Custom styling for tooltip inner labels */
+  .tooltip-label {
+    @apply text-[10px] font-bold tracking-widest text-white/40 mb-1 block;
+  }
+
+  .tooltip-value {
+    @apply text-[14px] font-bold leading-snug block text-white;
+  }
+
+  @keyframes tooltip-fade-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* ── Custom Utilities ──────────────────────────────────── */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
