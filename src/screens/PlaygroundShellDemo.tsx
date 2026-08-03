@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Settings, ShieldCheck } from "lucide-react";
+import { Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   PlaygroundSidebar,
@@ -118,14 +118,6 @@ export const PlaygroundShellDemo: React.FC<PlaygroundShellProps> = ({ children }
                   >
                     <Settings className="h-4 w-4" />
                     <span>Configuración</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="h-10 px-4 gap-2 text-xs font-semibold rounded-xl border-border/60 text-text-secondary hover:bg-primary/5 hover:border-primary/50 hover:text-primary transition-all shadow-sm active:scale-95"
-                    onClick={() => toast.info("Permisos de objetivos")}
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                    <span>Permisos</span>
                   </Button>
                 </div>
               </div>
