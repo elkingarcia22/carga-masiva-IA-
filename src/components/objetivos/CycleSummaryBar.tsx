@@ -37,7 +37,7 @@ export const CycleSummaryBar: React.FC<{
   );
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 px-5 py-3.5 rounded-xl border border-border/50 bg-surface-muted/30">
+    <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 px-5 py-3.5 rounded-xl border border-border/60 bg-surface shadow-sm">
       <div className="flex items-center gap-3 min-w-[280px] flex-1">
         <span className="text-[11px] font-bold text-text-secondary tracking-tight whitespace-nowrap">
           Avance general
