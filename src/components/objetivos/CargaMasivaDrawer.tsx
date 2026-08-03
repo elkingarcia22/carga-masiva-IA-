@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   Calendar,
   Check,
-  Download,
   FileSearch,
   FileText,
   Info,
@@ -430,36 +429,6 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                     onSelect={() => handleModeChange(entry.id)}
                   />
                 ))}
-              </div>
-
-              <div className="rounded-xl border border-border/40 bg-surface-subtle/60 p-4 space-y-2.5">
-                <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                  <p className="text-xs text-text-secondary/80 leading-relaxed">
-                    En <span className="font-bold text-text-primary">{cycleName}</span>:{" "}
-                    {modeConfig.intent} Tu archivo debe incluir estas columnas:
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pl-6">
-                  {modeConfig.columns.map((label) => (
-                    <span
-                      key={label}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-surface-muted text-text-secondary"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                </div>
-                <div className="pl-6 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => toast.info(`Descargando plantilla · ${modeConfig.label}`)}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primary hover:underline"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Descargar plantilla de {modeConfig.label.toLowerCase()}
-                  </button>
-                </div>
               </div>
 
               <UploadZone
