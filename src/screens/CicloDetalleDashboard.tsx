@@ -6,19 +6,16 @@ import {
   FileDown,
   FileText,
   HelpCircle,
-  Layers,
   Pencil,
   Plus,
   SearchX,
   Target,
-  Trash2,
+  Upload,
   UserMinus,
-  Weight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +37,7 @@ import { EmptyState } from "@/components/feedback/EmptyState";
 import {
   AssignedProgressBar,
   AssignedStatusBadge,
+  CargaMasivaDrawer,
   CycleSummaryBar,
   DEFAULT_PAGE_SIZE,
   FilterButton,
@@ -77,15 +75,6 @@ const CYCLE_ACTIONS = [
   { icon: FileDown, label: "Descargar progreso del ciclo" },
 ] as const;
 
-/** Actions that only make sense against a set of selected users. */
-const BULK_ACTIONS = [
-  { icon: Plus, label: "Crear objetivos", tone: "default" as const },
-  { icon: Weight, label: "Reasignar pesos", tone: "default" as const },
-  { icon: Layers, label: "Duplicar objetivos de otro ciclo", tone: "default" as const },
-  { icon: FileDown, label: "Descargar seleccionados", tone: "default" as const },
-  { icon: UserMinus, label: "Quitar del ciclo", tone: "destructive" as const },
-] as const;
-
 interface CicloDetalleDashboardProps {
   cycle: ObjectiveCycleItem;
   onBack: () => void;
@@ -97,7 +86,7 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
   const [performanceFilters, setPerformanceFilters] = React.useState<string[]>([]);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState<number>(DEFAULT_PAGE_SIZE);
-  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [isCargaMasivaOpen, setCargaMasivaOpen] = React.useState(false);
   // Held in state so refreshing re-reads its source, mirroring a future refetch.
   const [users, setUsers] = React.useState<AssignedUser[]>(() => getAssignedUsers(cycle));
 
@@ -128,27 +117,19 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
     [filteredUsers, safePage, pageSize]
   );
 
-  // Selection is scoped to what is currently visible, so a header checkbox can
-  // never silently act on rows the user has filtered out.
-  const visibleIds = visibleUsers.map((user) => user.id);
-  const selectedVisibleCount = visibleIds.filter((id) => selectedIds.includes(id)).length;
-  const areAllVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
-
-  const toggleAllVisible = () => {
-    setSelectedIds((prev) =>
-      areAllVisibleSelected
-        ? prev.filter((id) => !visibleIds.includes(id))
-        : [...new Set([...prev, ...visibleIds])]
-    );
-  };
+  /** What the uploaded file's rows are matched against. */
+  const rosterIdentifiers = React.useMemo(() => users.map((user) => user.username), [users]);
 
   const hasActiveFilters =
     statusFilters.length > 0 || performanceFilters.length > 0 || searchQuery !== "";
 
-  const handleRefresh = () => {
+  const reloadRoster = () => {
     setUsers(getAssignedUsers(cycle));
-    setSelectedIds([]);
     setPage(1);
+  };
+
+  const handleRefresh = () => {
+    reloadRoster();
     toast.success("Lista de usuarios asignados actualizada");
   };
 
@@ -269,10 +250,14 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
         }
         primaryAction={
           <div className="flex items-center gap-2">
-            <BulkActionsButton
-              selectedCount={selectedIds.length}
-              onClearSelection={() => setSelectedIds([])}
-            />
+            <Button
+              variant="outline"
+              onClick={() => setCargaMasivaOpen(true)}
+              className="h-10 px-4 gap-2 text-xs font-semibold rounded-xl border-border/60 text-text-secondary hover:bg-primary/5 hover:border-primary/50 hover:text-primary transition-all shadow-sm active:scale-95"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Carga masiva</span>
+            </Button>
             <Button
               className="h-10 px-5 gap-2 text-xs font-semibold rounded-xl shadow-lg active:scale-95"
               onClick={() => toast.info(`Crear objetivo · ${cycle.name}`)}
@@ -309,16 +294,8 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent border-b border-border/40 bg-muted/20">
-                <TableHead className="w-[40px] pl-6 pr-2">
-                  <Checkbox
-                    checked={areAllVisibleSelected}
-                    onCheckedChange={toggleAllVisible}
-                    aria-label="Seleccionar todos los usuarios visibles"
-                    className="border-border/60"
-                  />
-                </TableHead>
                 {[
-                  { label: "Username", className: "" },
+                  { label: "Username", className: "pl-8" },
                   { label: "Nombre de usuario", className: "" },
                   { label: "Correo", className: "" },
                   { label: "Estado", className: "" },
@@ -343,27 +320,12 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
             </TableHeader>
             <TableBody>
               {visibleUsers.map((user) => {
-                const isSelected = selectedIds.includes(user.id);
                 return (
                   <TableRow
                     key={user.id}
-                    data-state={isSelected ? "selected" : undefined}
-                    className={cn(
-                      "border-b border-border/40 transition-colors group",
-                      isSelected ? "bg-primary/5" : "hover:bg-muted/20"
-                    )}
+                    className="border-b border-border/40 transition-colors group hover:bg-muted/20"
                   >
-                    <TableCell className="pl-6 pr-2 py-4">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() =>
-                          setSelectedIds((prev) => toggleValue(prev, user.id))
-                        }
-                        aria-label={`Seleccionar ${user.name}`}
-                        className="border-border/60"
-                      />
-                    </TableCell>
-                    <TableCell className="py-4 text-[12px] font-bold text-text-primary max-w-[150px]">
+                    <TableCell className="py-4 pl-8 text-[12px] font-bold text-text-primary max-w-[150px]">
                       <span className="block truncate">{user.username}</span>
                     </TableCell>
                     <TableCell className="text-[11px] font-bold text-text-secondary/80 max-w-[150px]">
@@ -413,88 +375,17 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
           </Table>
         )}
       </ListCard>
+
+      <CargaMasivaDrawer
+        open={isCargaMasivaOpen}
+        onOpenChange={setCargaMasivaOpen}
+        cycleName={cycle.name}
+        rosterIdentifiers={rosterIdentifiers}
+        // Silent reload: the drawer already reports the result, and a second
+        // "list updated" toast on top of it is just noise.
+        onUploaded={reloadRoster}
+      />
     </div>
-  );
-};
-
-/**
- * Bulk actions act on the checkbox selection, so the trigger stays disabled
- * until something is selected and carries the count once it is — otherwise
- * pressing it would raise the question "applied to what?".
- */
-const BulkActionsButton: React.FC<{
-  selectedCount: number;
-  onClearSelection: () => void;
-}> = ({ selectedCount, onClearSelection }) => {
-  const isDisabled = selectedCount === 0;
-
-  const trigger = (
-    <Button
-      variant="outline"
-      disabled={isDisabled}
-      className="h-10 px-4 gap-2 text-xs font-semibold rounded-xl border-border/60 text-text-secondary hover:bg-primary/5 hover:border-primary/50 hover:text-primary transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
-    >
-      <span>Acciones masivas</span>
-      {selectedCount > 0 && (
-        <span className="h-5 min-w-5 px-1 rounded-full bg-primary text-text-inverse text-[10px] font-extrabold flex items-center justify-center tabular-nums">
-          {selectedCount}
-        </span>
-      )}
-      <ChevronDown className="h-4 w-4 opacity-50 group-data-[state=open]:rotate-180 transition-transform duration-200" />
-    </Button>
-  );
-
-  if (isDisabled) {
-    return (
-      <Tooltip>
-        {/* A disabled button emits no pointer events, so the tooltip needs a wrapper. */}
-        <TooltipTrigger asChild>
-          <span className="inline-flex">{trigger}</span>
-        </TooltipTrigger>
-        <TooltipContent side="top">
-          <span>Selecciona usuarios para aplicar acciones masivas</span>
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        sideOffset={8}
-        className="w-72 p-1.5 rounded-xl border border-border/40 shadow-2xl z-[100]"
-      >
-        <DropdownMenuLabel className="px-2.5 py-1.5 text-[10px] font-bold text-text-secondary/40 uppercase tracking-widest">
-          {selectedCount} {selectedCount === 1 ? "usuario seleccionado" : "usuarios seleccionados"}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-border/40 mx-1 my-1" />
-        {BULK_ACTIONS.map(({ icon: Icon, label, tone }) => (
-          <DropdownMenuItem
-            key={label}
-            onSelect={() => toast.info(`${label} · ${selectedCount} usuarios`)}
-            className={cn(
-              "flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-[12px] font-semibold outline-none",
-              tone === "destructive"
-                ? "text-destructive focus:bg-destructive/5 focus:text-destructive"
-                : "focus:bg-primary/5 focus:text-primary"
-            )}
-          >
-            <Icon className="h-4 w-4 opacity-60 shrink-0" />
-            {label}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator className="bg-border/40 mx-1 my-1" />
-        <DropdownMenuItem
-          onSelect={onClearSelection}
-          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-[12px] font-semibold text-text-secondary/70 focus:bg-muted outline-none"
-        >
-          <Trash2 className="h-4 w-4 opacity-60 shrink-0" />
-          Limpiar selección
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 };
 
