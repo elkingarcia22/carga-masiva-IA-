@@ -4,3 +4,4 @@ export * from "./CycleProgress";
 export * from "./CycleSummaryBar";
 export * from "./AssignedUserCells";
 export * from "./progressFormat";
+export * from "./pageSize";

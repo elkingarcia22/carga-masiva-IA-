@@ -563,8 +563,11 @@ export function getAssignedUsers(cycle: ObjectiveCycleItem): AssignedUser[] {
   if (cycle.objectivesCount === 0) return [];
 
   const random = createRandom(seedFromId(cycle.id));
-  // Between 2 and 12 people, never more than there are objectives to go round.
-  const userCount = Math.max(1, Math.min(cycle.objectivesCount, 2 + Math.floor(random() * 11)));
+  // Between 10 and 34 people, never more than there are objectives to go round —
+  // every user needs at least one. Rosters this size are both closer to how a
+  // real cycle is staffed and enough to fill the table instead of leaving a
+  // band of empty card under three or four rows.
+  const userCount = Math.max(1, Math.min(cycle.objectivesCount, 10 + Math.floor(random() * 25)));
 
   // Raw shares, normalised afterwards so both columns total what they should.
   const shares = Array.from({ length: userCount }, () => 0.2 + random());

@@ -51,8 +51,12 @@ export const PlaygroundShellDemo: React.FC<PlaygroundShellProps> = ({ children }
   const activeItems = getPlaygroundNavigation(role);
 
 
+  // h-screen, not min-h-screen: the shell has to be exactly one viewport tall for
+  // <main>'s own overflow-y-auto to become the scroll container. Left to grow
+  // with its content, the whole document scrolled instead and the page frame
+  // drifted out from under the fixed sidebar.
   return (
-    <div className="flex w-full min-h-screen bg-background font-sans transition-all duration-700 overflow-hidden">
+    <div className="flex w-full h-screen bg-background font-sans transition-all duration-700 overflow-hidden">
       {/* Rail Sidebar */}
       <PlaygroundSidebar 
         role={role === "creator" || role === "recruitment" ? "shared" : role}

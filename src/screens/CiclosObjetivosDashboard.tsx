@@ -27,6 +27,7 @@ import {
   CycleStatusBadge,
   FilterButton,
   InlineSearch,
+  DEFAULT_PAGE_SIZE,
   ListCard,
   RefreshButton,
   formatProgress,
@@ -45,7 +46,6 @@ import type { ObjectiveCycleItem } from "@/mocks/types";
  * searchable and filterable, with the per-row actions that manage each one.
  */
 
-const PAGE_SIZE = 12;
 
 /** Toggles a value in a selection set without mutating the original array. */
 function toggleValue(selected: string[], value: string): string[] {
@@ -117,6 +117,7 @@ export const CiclosObjetivosDashboard: React.FC = () => {
   const [periodFilters, setPeriodFilters] = React.useState<string[]>([]);
   const [statusFilters, setStatusFilters] = React.useState<string[]>([]);
   const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState<number>(DEFAULT_PAGE_SIZE);
   // The list the table renders. Held in state (rather than read straight from
   // the mock) so refreshing genuinely re-reads its source, the way a refetch
   // would once this is wired to the API.
@@ -136,14 +137,14 @@ export const CiclosObjetivosDashboard: React.FC = () => {
     });
   }, [cycles, searchQuery, periodFilters, statusFilters]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredCycles.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filteredCycles.length / pageSize));
   // Narrowing the results can leave `page` past the end of the list. Clamping on
   // read keeps that a derived value instead of a second source of truth.
   const safePage = Math.min(page, pageCount);
 
   const visibleCycles = React.useMemo(
-    () => filteredCycles.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filteredCycles, safePage]
+    () => filteredCycles.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredCycles, safePage, pageSize]
   );
 
   const hasActiveFilters = periodFilters.length > 0 || statusFilters.length > 0 || searchQuery !== "";
@@ -236,8 +237,12 @@ export const CiclosObjetivosDashboard: React.FC = () => {
         page: safePage,
         pageCount,
         totalItems: filteredCycles.length,
-        pageSize: PAGE_SIZE,
+        pageSize,
         onPageChange: setPage,
+        onPageSizeChange: (size) => {
+          setPageSize(size);
+          setPage(1);
+        },
       }}
     >
       {visibleCycles.length === 0 ? (

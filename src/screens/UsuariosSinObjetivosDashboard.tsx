@@ -11,7 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/feedback/EmptyState";
-import { FilterButton, InlineSearch, ListCard, RefreshButton } from "@/components/objetivos";
+import {
+  DEFAULT_PAGE_SIZE,
+  FilterButton,
+  InlineSearch,
+  ListCard,
+  RefreshButton,
+} from "@/components/objetivos";
 import { USERS_WITHOUT_OBJECTIVES, USER_AREAS } from "@/mocks/objetivosMocks";
 import type { UserWithoutObjectives } from "@/mocks/types";
 
@@ -21,8 +27,6 @@ import type { UserWithoutObjectives } from "@/mocks/types";
  * Main view of the "Usuarios sin objetivos" tab: collaborators who have no
  * objectives assigned yet, with a per-row shortcut to create them.
  */
-
-const PAGE_SIZE = 12;
 
 function toggleValue(selected: string[], value: string): string[] {
   return selected.includes(value)
@@ -34,6 +38,7 @@ export const UsuariosSinObjetivosDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [areaFilters, setAreaFilters] = React.useState<string[]>([]);
   const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState<number>(DEFAULT_PAGE_SIZE);
   // Held in state so refreshing re-reads its source, mirroring a future refetch.
   const [users, setUsers] = React.useState<UserWithoutObjectives[]>(USERS_WITHOUT_OBJECTIVES);
 
@@ -54,13 +59,13 @@ export const UsuariosSinObjetivosDashboard: React.FC = () => {
     });
   }, [users, searchQuery, areaFilters]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   // Clamped on read so narrowing the results can't leave the view on an empty page.
   const safePage = Math.min(page, pageCount);
 
   const visibleUsers = React.useMemo(
-    () => filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filteredUsers, safePage]
+    () => filteredUsers.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredUsers, safePage, pageSize]
   );
 
   const hasActiveFilters = areaFilters.length > 0 || searchQuery !== "";
@@ -112,8 +117,12 @@ export const UsuariosSinObjetivosDashboard: React.FC = () => {
         page: safePage,
         pageCount,
         totalItems: filteredUsers.length,
-        pageSize: PAGE_SIZE,
+        pageSize,
         onPageChange: setPage,
+        onPageSizeChange: (size) => {
+          setPageSize(size);
+          setPage(1);
+        },
       }}
     >
       {visibleUsers.length === 0 ? (

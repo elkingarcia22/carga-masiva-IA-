@@ -2,6 +2,7 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { PAGE_SIZE_OPTIONS } from "./pageSize";
 
 /**
  * The card every objectives list lives in: a titled header with its own action
@@ -29,6 +30,8 @@ interface PaginationProps {
   totalItems: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  /** Omit to render a fixed page size with no selector. */
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 export const ListCard: React.FC<ListCardProps> = ({
@@ -85,14 +88,35 @@ const ListPagination: React.FC<PaginationProps> = ({
   totalItems,
   pageSize,
   onPageChange,
+  onPageSizeChange,
 }) => {
   const firstItem = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastItem = Math.min(page * pageSize, totalItems);
 
   return (
     <div className="px-8 py-4 flex items-center justify-between gap-4 border-t border-border/60 bg-surface">
-      <div className="text-[11px] font-bold text-text-secondary/60 tabular-nums">
-        Mostrando {firstItem}-{lastItem} de {totalItems.toLocaleString('es-CO')}
+      <div className="flex items-center gap-4 min-w-[200px]">
+        <span className="text-[11px] font-bold text-text-secondary/60 tabular-nums whitespace-nowrap">
+          Mostrando {firstItem}-{lastItem} de {totalItems.toLocaleString('es-CO')}
+        </span>
+        {onPageSizeChange && (
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary/40 whitespace-nowrap">
+            <span className="sr-only">Filas por página</span>
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              aria-label="Filas por página"
+              className="h-7 pl-2 pr-1 rounded-lg border border-border/60 bg-surface text-[11px] font-bold text-text-secondary tabular-nums cursor-pointer transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            por página
+          </label>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <Button
@@ -134,7 +158,7 @@ const ListPagination: React.FC<PaginationProps> = ({
           <ChevronRight className="h-4 w-4 text-text-primary" />
         </Button>
       </div>
-      <div className="text-[11px] font-bold text-text-secondary/40 tabular-nums w-[120px] text-right">
+      <div className="text-[11px] font-bold text-text-secondary/40 tabular-nums min-w-[200px] text-right whitespace-nowrap">
         Página {page} de {pageCount}
       </div>
     </div>

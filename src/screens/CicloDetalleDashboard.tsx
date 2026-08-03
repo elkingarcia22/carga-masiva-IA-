@@ -41,6 +41,7 @@ import {
   AssignedProgressBar,
   AssignedStatusBadge,
   CycleSummaryBar,
+  DEFAULT_PAGE_SIZE,
   FilterButton,
   InlineSearch,
   ListCard,
@@ -61,8 +62,6 @@ import type { AssignedUser, ObjectiveCycleItem } from "@/mocks/types";
  * Detail view for a single cycle: its overall advance plus the roster of users
  * assigned to it, with the per-user objective management the list can't offer.
  */
-
-const PAGE_SIZE = 16;
 
 function toggleValue(selected: string[], value: string): string[] {
   return selected.includes(value)
@@ -97,6 +96,7 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
   const [statusFilters, setStatusFilters] = React.useState<string[]>([]);
   const [performanceFilters, setPerformanceFilters] = React.useState<string[]>([]);
   const [page, setPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState<number>(DEFAULT_PAGE_SIZE);
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   // Held in state so refreshing re-reads its source, mirroring a future refetch.
   const [users, setUsers] = React.useState<AssignedUser[]>(() => getAssignedUsers(cycle));
@@ -120,12 +120,12 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
     });
   }, [users, searchQuery, statusFilters, performanceFilters]);
 
-  const pageCount = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const safePage = Math.min(page, pageCount);
 
   const visibleUsers = React.useMemo(
-    () => filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [filteredUsers, safePage]
+    () => filteredUsers.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredUsers, safePage, pageSize]
   );
 
   // Selection is scoped to what is currently visible, so a header checkbox can
@@ -286,8 +286,12 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
           page: safePage,
           pageCount,
           totalItems: filteredUsers.length,
-          pageSize: PAGE_SIZE,
+          pageSize,
           onPageChange: setPage,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(1);
+          },
         }}
       >
         {visibleUsers.length === 0 ? (
