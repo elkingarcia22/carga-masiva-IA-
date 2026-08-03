@@ -1,4 +1,8 @@
-import type { ObjectiveCycleStatus } from "@/mocks/types";
+import type {
+  AssignedUserStatus,
+  ObjectiveCycleStatus,
+  PerformanceLevel,
+} from "@/mocks/types";
 
 /**
  * Presentation rules for a cycle's progress and status.
@@ -34,6 +38,15 @@ export const TONE_COLOR: Record<ProgressTone, "primary" | "success" | "warning" 
   over: "destructive",
 };
 
+/** Same tones as plain background classes, for bars built without the Progress primitive. */
+export const TONE_BG: Record<ProgressTone, string> = {
+  empty: "bg-muted",
+  low: "bg-status-warning",
+  mid: "bg-primary",
+  high: "bg-status-positive",
+  over: "bg-destructive",
+};
+
 export const TONE_HINT: Record<ProgressTone, string> = {
   empty: "Sin avance registrado",
   low: "Avance bajo",
@@ -56,4 +69,21 @@ export const STATUS_CLASS: Record<ObjectiveCycleStatus, string> = {
   "En progreso": "bg-status-warning/15 text-status-warning",
   Finalizado: "bg-status-positive-bg text-status-positive",
   Programado: "bg-info/10 text-info",
+};
+
+/**
+ * "Por iniciar" stays deliberately neutral: nobody having started yet is a
+ * normal state at the top of a cycle, not something to flag.
+ */
+export const ASSIGNED_STATUS_CLASS: Record<AssignedUserStatus, string> = {
+  "Por iniciar": "bg-surface-muted text-text-secondary/70",
+  "En progreso": "bg-status-warning/15 text-status-warning",
+  Finalizado: "bg-status-positive-bg text-status-positive",
+};
+
+export const PERFORMANCE_CLASS: Record<PerformanceLevel, string> = {
+  Sobresaliente: "text-status-positive",
+  Excelente: "text-status-positive",
+  Bueno: "text-info",
+  "Por mejorar": "text-destructive",
 };

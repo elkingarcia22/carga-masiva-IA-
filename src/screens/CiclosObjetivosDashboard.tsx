@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/feedback/EmptyState";
+import { CicloDetalleDashboard } from "@/screens/CicloDetalleDashboard";
 import {
   CycleProgressBar,
   CycleStatusBadge,
@@ -53,7 +54,10 @@ function toggleValue(selected: string[], value: string): string[] {
 }
 
 /** One row's action menu — the "Acciones" column of the reference list. */
-const CycleRowActions: React.FC<{ cycle: ObjectiveCycleItem }> = ({ cycle }) => (
+const CycleRowActions: React.FC<{
+  cycle: ObjectiveCycleItem;
+  onOpen: () => void;
+}> = ({ cycle, onOpen }) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button
@@ -76,14 +80,14 @@ const CycleRowActions: React.FC<{ cycle: ObjectiveCycleItem }> = ({ cycle }) => 
       </DropdownMenuLabel>
       <DropdownMenuSeparator className="bg-border/40 mx-1 my-1" />
       {[
-        { icon: Eye, label: "Ver detalle" },
-        { icon: Target, label: "Ver objetivos" },
+        { icon: Eye, label: "Ver detalle", onSelect: onOpen },
+        { icon: Target, label: "Ver objetivos", onSelect: onOpen },
         { icon: Pencil, label: "Editar ciclo" },
         { icon: Copy, label: "Duplicar ciclo" },
-      ].map(({ icon: Icon, label }) => (
+      ].map(({ icon: Icon, label, onSelect }) => (
         <DropdownMenuItem
           key={label}
-          onSelect={() => toast.info(`${label} · ${cycle.name}`)}
+          onSelect={onSelect ?? (() => toast.info(`${label} · ${cycle.name}`))}
           className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-[12px] font-semibold focus:bg-primary/5 focus:text-primary outline-none"
         >
           <Icon className="h-4 w-4 opacity-60" />
@@ -103,6 +107,10 @@ const CycleRowActions: React.FC<{ cycle: ObjectiveCycleItem }> = ({ cycle }) => 
 );
 
 export const CiclosObjetivosDashboard: React.FC = () => {
+  // The open cycle, or null while the list is showing. Kept here rather than in
+  // the shell so the list's own search, filters and page survive a round trip
+  // into a cycle and back out.
+  const [openCycle, setOpenCycle] = React.useState<ObjectiveCycleItem | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [periodFilters, setPeriodFilters] = React.useState<string[]>([]);
   const [statusFilters, setStatusFilters] = React.useState<string[]>([]);
@@ -145,6 +153,10 @@ export const CiclosObjetivosDashboard: React.FC = () => {
     setPage(1);
     toast.success("Lista de ciclos actualizada");
   };
+
+  if (openCycle) {
+    return <CicloDetalleDashboard cycle={openCycle} onBack={() => setOpenCycle(null)} />;
+  }
 
   return (
     <ListCard
@@ -257,8 +269,14 @@ export const CiclosObjetivosDashboard: React.FC = () => {
                 key={cycle.id}
                 className="border-b border-border/40 transition-colors group hover:bg-muted/20"
               >
-                <TableCell className="py-4 px-8 text-[12px] font-bold text-text-primary max-w-[280px]">
-                  <span className="line-clamp-2">{cycle.name}</span>
+                <TableCell className="py-4 px-8 max-w-[280px]">
+                  <button
+                    type="button"
+                    onClick={() => setOpenCycle(cycle)}
+                    className="text-left text-[12px] font-bold text-text-primary line-clamp-2 rounded-sm transition-colors hover:text-primary hover:underline decoration-primary/40 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    {cycle.name}
+                  </button>
                 </TableCell>
                 <TableCell className="text-[11px] font-bold text-text-secondary/70 whitespace-nowrap">
                   {cycle.period}
@@ -292,7 +310,7 @@ export const CiclosObjetivosDashboard: React.FC = () => {
                   {formatProgress(cycle.progress)}
                 </TableCell>
                 <TableCell className="text-right pr-8">
-                  <CycleRowActions cycle={cycle} />
+                  <CycleRowActions cycle={cycle} onOpen={() => setOpenCycle(cycle)} />
                 </TableCell>
               </TableRow>
             ))}

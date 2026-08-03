@@ -226,3 +226,29 @@ export interface UserWithoutObjectives {
   leader?: string;
 }
 
+/** How far a user has got with the objectives assigned to them in a cycle. */
+export type AssignedUserStatus = 'Por iniciar' | 'En progreso' | 'Finalizado';
+
+/** Performance band a user's progress falls into, shown in the "Desempeño" column. */
+export type PerformanceLevel = 'Excelente' | 'Sobresaliente' | 'Bueno' | 'Por mejorar';
+
+/** One row of a cycle's "Lista de usuarios asignados". */
+export interface AssignedUser {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  status: AssignedUserStatus;
+  objectivesCount: number;
+  /** Share of the cycle's total weight this user carries. */
+  weightPercent: number;
+  /**
+   * Weighted completion across the user's objectives, split into the part
+   * already closed out and the part still moving — the two segments the
+   * progress bar renders. `completedProgress` is always <= `progress`.
+   */
+  progress: number;
+  completedProgress: number;
+  performance: PerformanceLevel;
+}
+

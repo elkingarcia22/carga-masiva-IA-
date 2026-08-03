@@ -1,7 +1,10 @@
 import type {
+  AssignedUser,
+  AssignedUserStatus,
   ObjectiveCycleItem,
   ObjectiveCyclePeriod,
   ObjectiveCycleStatus,
+  PerformanceLevel,
   UserWithoutObjectives,
 } from './types';
 
@@ -436,3 +439,178 @@ export const USERS_WITHOUT_OBJECTIVES: UserWithoutObjectives[] = [
 export const USER_AREAS: string[] = [
   ...new Set(USERS_WITHOUT_OBJECTIVES.map((user) => user.area)),
 ].sort((a, b) => a.localeCompare(b));
+
+// --- Usuarios asignados a un ciclo -----------------------------------------
+
+export const ASSIGNED_USER_STATUSES: AssignedUserStatus[] = [
+  'Por iniciar',
+  'En progreso',
+  'Finalizado',
+];
+
+export const PERFORMANCE_LEVELS: PerformanceLevel[] = [
+  'Excelente',
+  'Sobresaliente',
+  'Bueno',
+  'Por mejorar',
+];
+
+/**
+ * The users assigned to the first seeded cycle. Kept explicit because their
+ * objective counts add up to that cycle's 21 objectives — a generated set would
+ * drift from the total shown in the list and make the two screens disagree.
+ */
+const SEEDED_ASSIGNED_USERS: AssignedUser[] = [
+  {
+    id: 'asg-001',
+    username: 'usercreadorqa@example.co',
+    name: 'Cursos Empresariales 3099 - Prueba QA',
+    email: 'usercreadorqa@example.co',
+    status: 'Por iniciar',
+    objectivesCount: 6,
+    weightPercent: 6,
+    progress: 0,
+    completedProgress: 0,
+    performance: 'Por mejorar',
+  },
+  {
+    id: 'asg-002',
+    username: 'martica',
+    name: 'marta forero',
+    email: 'martica1@example.co',
+    status: 'En progreso',
+    objectivesCount: 10,
+    weightPercent: 94,
+    progress: 84.69,
+    completedProgress: 41.2,
+    performance: 'Excelente',
+  },
+  {
+    id: 'asg-003',
+    username: 'jlopezsincrorolesypermisos01@example.co',
+    name: 'Jorge Lopez',
+    email: 'jlopezsincrorolesypermisos01@example.co',
+    status: 'Por iniciar',
+    objectivesCount: 1,
+    weightPercent: 1,
+    progress: 0,
+    completedProgress: 0,
+    performance: 'Por mejorar',
+  },
+  {
+    id: 'asg-004',
+    username: 'surveys19',
+    name: 'Alejandro Ramírez',
+    email: 'surveys19@example.co',
+    status: 'Por iniciar',
+    objectivesCount: 2,
+    weightPercent: 2,
+    progress: 0,
+    completedProgress: 0,
+    performance: 'Por mejorar',
+  },
+  {
+    id: 'asg-005',
+    username: 'crrincon@example.co',
+    name: 'Cristian Rincón',
+    email: 'crrincon@example.co',
+    status: 'Por iniciar',
+    objectivesCount: 1,
+    weightPercent: 1,
+    progress: 0,
+    completedProgress: 0,
+    performance: 'Por mejorar',
+  },
+  {
+    id: 'asg-006',
+    username: 'pobjetivos',
+    name: 'prueba hhhhh objetivos',
+    email: 'pobjetivos@example.co',
+    status: 'Por iniciar',
+    objectivesCount: 1,
+    weightPercent: 1,
+    progress: 0,
+    completedProgress: 0,
+    performance: 'Por mejorar',
+  },
+];
+
+/** Performance band a user's completion falls into. */
+function getPerformanceLevel(progress: number): PerformanceLevel {
+  if (progress >= 95) return 'Sobresaliente';
+  if (progress >= 70) return 'Excelente';
+  if (progress >= 40) return 'Bueno';
+  return 'Por mejorar';
+}
+
+/**
+ * Turns a numeric seed into a stable integer so a cycle id always produces the
+ * same roster. Uses the digits in the id, which every generated id carries.
+ */
+function seedFromId(id: string): number {
+  return [...id].reduce((total, char) => (total * 31 + char.charCodeAt(0)) >>> 0, 7);
+}
+
+/**
+ * Builds the roster for a cycle. Objective counts are distributed so they sum to
+ * the cycle's own `objectivesCount`, and weights sum to 100 — otherwise the
+ * detail view would contradict the number the list already showed for that row.
+ * A cycle with no objectives has no assigned users, which is what makes the
+ * empty state reachable.
+ */
+export function getAssignedUsers(cycle: ObjectiveCycleItem): AssignedUser[] {
+  if (cycle.id === SEEDED_CYCLES[0]?.id) return SEEDED_ASSIGNED_USERS;
+  if (cycle.objectivesCount === 0) return [];
+
+  const random = createRandom(seedFromId(cycle.id));
+  // Between 2 and 12 people, never more than there are objectives to go round.
+  const userCount = Math.max(1, Math.min(cycle.objectivesCount, 2 + Math.floor(random() * 11)));
+
+  // Raw shares, normalised afterwards so both columns total what they should.
+  const shares = Array.from({ length: userCount }, () => 0.2 + random());
+  const sharesTotal = shares.reduce((total, share) => total + share, 0);
+
+  let objectivesLeft = cycle.objectivesCount;
+  let weightLeft = 100;
+
+  return shares.map((share, index) => {
+    const isLast = index === userCount - 1;
+    // The last row absorbs the rounding remainder so the totals stay exact.
+    const objectivesCount = isLast
+      ? objectivesLeft
+      : Math.max(1, Math.min(objectivesLeft - (userCount - index - 1), Math.round((share / sharesTotal) * cycle.objectivesCount)));
+    const weightPercent = isLast
+      ? Math.round(weightLeft * 100) / 100
+      : Math.round((share / sharesTotal) * 100 * 100) / 100;
+
+    objectivesLeft -= objectivesCount;
+    weightLeft -= weightPercent;
+
+    // Individual progress scatters around the cycle's own figure so the roster
+    // averages out to roughly what the list reported.
+    const spread = 0.45 + random() * 1.3;
+    const progress = Math.max(0, Math.round(Math.min(cycle.progress * spread, 118) * 100) / 100);
+    const status: AssignedUserStatus =
+      progress <= 0 ? 'Por iniciar' : progress >= 100 ? 'Finalizado' : 'En progreso';
+    // Part of the advance already closed out; the rest is still in flight.
+    const completedProgress = Math.round(progress * (0.3 + random() * 0.55) * 100) / 100;
+
+    const number = index + 1;
+    const firstName = pick(random, FIRST_NAMES);
+    const lastName = pick(random, LAST_NAMES);
+    const username = `${firstName.toLowerCase()}.${stripAccents(lastName.toLowerCase())}${number}`;
+
+    return {
+      id: `${cycle.id}-asg-${number.toString().padStart(2, '0')}`,
+      username,
+      name: `${firstName} ${lastName}`,
+      email: `${username}@example.co`,
+      status,
+      objectivesCount,
+      weightPercent,
+      progress,
+      completedProgress,
+      performance: getPerformanceLevel(progress),
+    } satisfies AssignedUser;
+  });
+}
