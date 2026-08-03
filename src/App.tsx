@@ -1,6 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UbitsToaster } from "@/components/feedback";
-import { EncuestasDashboard } from "@/screens/EncuestasDashboard";
+import { CiclosObjetivosDashboard } from "@/screens/CiclosObjetivosDashboard";
 import { PlaygroundShellDemo } from "@/screens/PlaygroundShellDemo";
 
 function App() {
@@ -8,7 +8,7 @@ function App() {
     <TooltipProvider>
       <UbitsToaster />
       <PlaygroundShellDemo>
-        <EncuestasDashboard />
+        <CiclosObjetivosDashboard />
       </PlaygroundShellDemo>
     </TooltipProvider>
   );

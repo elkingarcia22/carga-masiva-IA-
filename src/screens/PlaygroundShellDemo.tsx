@@ -1,9 +1,12 @@
 import * as React from "react";
-import { 
+import { Settings, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
+import {
   PlaygroundSidebar,
   UbitsTabs
 } from "@/components/navigation";
-import { DatosDemograficosDashboard } from "@/screens/DatosDemograficosDashboard";
+import { Button } from "@/components/ui/button";
+import { UsuariosSinObjetivosDashboard } from "@/screens/UsuariosSinObjetivosDashboard";
 import { UbitsIcon } from "@/icons";
 import { UbitsLogo } from "@/components/ui/UbitsLogo";
 import { getPlaygroundNavigation } from "@/config/playgroundNavigation";
@@ -20,8 +23,8 @@ interface PlaygroundShellProps {
 
 export const PlaygroundShellDemo: React.FC<PlaygroundShellProps> = ({ children }) => {
   const [role] = React.useState<PlaygroundRole>("admin");
-  const [activeSidebarId, setActiveSidebarId] = React.useState("encuestas");
-  const [activeTabId, setActiveTabId] = React.useState("encuestas");
+  const [activeSidebarId, setActiveSidebarId] = React.useState("desempeño");
+  const [activeTabId, setActiveTabId] = React.useState("ciclos_objetivos");
   const [isDark, setIsDark] = React.useState(false);
 
   // Global Theme Sync
@@ -83,24 +86,45 @@ export const PlaygroundShellDemo: React.FC<PlaygroundShellProps> = ({ children }
       <main className="flex-1 ml-[143px] flex flex-col px-8 pb-8 overflow-y-auto">
          {/* Dual-Tab Navigation Integration */}
          <div className="w-full max-w-7xl mx-auto mb-10 pt-4">
-            <div className="mb-8">
-              <UbitsTabs 
+            {/* Tabs own the left of the row; surface-level settings sit opposite
+                them so they read as scoped to the whole section, not to a list. */}
+            <div className="mb-8 flex items-center justify-between gap-6">
+              <UbitsTabs
                 tabs={[
-                  { id: "encuestas", label: "Encuestas" },
-                  { id: "datos_demograficos", label: "Datos Demográficos" }
+                  { id: "ciclos_objetivos", label: "Ciclos de objetivos" },
+                  { id: "usuarios_sin_objetivos", label: "Usuarios sin objetivos" }
                 ]}
                 activeTabId={activeTabId}
                 onTabChange={(id) => setActiveTabId(id)}
                 className="mb-0"
               />
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  className="h-10 px-4 gap-2 text-xs font-semibold rounded-xl border-border/60 text-text-secondary hover:bg-primary/5 hover:border-primary/50 hover:text-primary transition-all shadow-sm active:scale-95"
+                  onClick={() => toast.info("Configuración de objetivos")}
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Configuración</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10 px-4 gap-2 text-xs font-semibold rounded-xl border-border/60 text-text-secondary hover:bg-primary/5 hover:border-primary/50 hover:text-primary transition-all shadow-sm active:scale-95"
+                  onClick={() => toast.info("Permisos de objetivos")}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Permisos</span>
+                </Button>
+              </div>
             </div>
 
             {/* Content Injection Area */}
             <div className="min-h-[70vh]">
-              {activeTabId === "encuestas" ? (
+              {activeTabId === "ciclos_objetivos" ? (
                 children
-              ) : activeTabId === "datos_demograficos" ? (
-                <DatosDemograficosDashboard />
+              ) : activeTabId === "usuarios_sin_objetivos" ? (
+                <UsuariosSinObjetivosDashboard />
               ) : (
                 <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl opacity-20 select-none py-20">
                   <UbitsLogo size={80} />

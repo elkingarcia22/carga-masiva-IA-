@@ -188,3 +188,41 @@ export interface SurveyListItem {
   uploadTaskId?: number;
 }
 
+/** Cadence a cycle runs on. "Personalizado" means arbitrary start/end dates. */
+export type ObjectiveCyclePeriod =
+  | 'Anual'
+  | 'Semestre'
+  | 'Trimestre'
+  | 'Bimestre'
+  | 'Mes'
+  | 'Personalizado';
+
+/** Lifecycle of a cycle, derived from its dates on the backend. */
+export type ObjectiveCycleStatus = 'En progreso' | 'Finalizado' | 'Programado';
+
+/** One row of the "Ciclos de objetivos" list. */
+export interface ObjectiveCycleItem {
+  id: string;
+  name: string;
+  period: ObjectiveCyclePeriod;
+  /** Long-form date, e.g. "06 abril 2026". */
+  startDate: string;
+  endDate: string;
+  status: ObjectiveCycleStatus;
+  /** Objectives assigned inside the cycle — 0 means nobody has created any yet. */
+  objectivesCount: number;
+  /** Weighted completion. Can exceed 100 when objectives are over-achieved. */
+  progress: number;
+}
+
+/** One row of the "Usuarios sin objetivos" list. */
+export interface UserWithoutObjectives {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  area: string;
+  /** Direct leader, absent when the user sits at the top of their branch. */
+  leader?: string;
+}
+
