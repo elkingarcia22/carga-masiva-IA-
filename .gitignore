@@ -25,3 +25,16 @@ dist-ssr
 
 # Reference repos (cloned locally, not tracked)
 references/
+
+# Vercel
+.vercel
+
+# Ajustes locales de Claude Code: llevan rutas de la máquina y nombres de
+# archivos personales. `launch.json` sí se versiona — es config del proyecto.
+.claude/settings.local.json
+
+# Datos REALES de una encuesta de clima (613 colaboradores con área, género,
+# rango de edad, antigüedad y sede). No los usa ningún código: se arrastran a
+# mano para la demo de encuestas. Fuera del repo a propósito.
+# Todo lo demás de demo-samples/ es sintético y lo generan los scripts/.
+demo-samples/encuesta-real/
