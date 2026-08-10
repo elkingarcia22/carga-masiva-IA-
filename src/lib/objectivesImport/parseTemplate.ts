@@ -180,6 +180,25 @@ function locateHeader(rows: unknown[][]): HeaderLocation | null {
   return null;
 }
 
+/**
+ * Which template the sheet turned out to be, read off its columns alone.
+ *
+ * Only the two columns that exist in exactly one template are reported, because
+ * they are the only ones that identify a file rather than merely fit it. The
+ * three templates overlap almost completely — `editar` is `crear` plus a rename
+ * column — so "has the columns of X" proves nothing on its own, while "has
+ * `nuevo_avance`" can only come from an update file.
+ *
+ * Read before the mode is consulted, so the answer is about the file and not
+ * about what the user said the file was.
+ */
+export interface TemplateSignature {
+  /** `nuevo_avance` — only the "actualizar" template carries it. */
+  hasNewProgress: boolean;
+  /** `nombre_objetivo_nuevo` — only the "editar" template carries it. */
+  hasNewTitle: boolean;
+}
+
 export interface TemplateParseResult {
   sheetName: string;
   objectives: ParsedObjective[];
@@ -187,6 +206,8 @@ export interface TemplateParseResult {
   skippedRows: number;
   /** Things worth telling the user about how the file was read. */
   notes: string[];
+  /** What the columns say this file is, regardless of the chosen operation. */
+  signature: TemplateSignature;
 }
 
 /**
@@ -392,7 +413,16 @@ export function parseObjectivesSheet(
     );
   }
 
-  return { sheetName, objectives, skippedRows, notes };
+  return {
+    sheetName,
+    objectives,
+    skippedRows,
+    notes,
+    signature: {
+      hasNewProgress: columns.newProgress !== undefined,
+      hasNewTitle: columns.newTitle !== undefined,
+    },
+  };
 }
 
 /** Parses the first sheet that looks like an objectives template. */

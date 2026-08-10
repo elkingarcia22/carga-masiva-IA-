@@ -16,6 +16,7 @@ import { buildUserIndex, groupHasStructuralErrors, matchIdentifier } from './mat
 import {
   parseObjectivesWorkbook,
   type TemplateParseResult,
+  type TemplateSignature,
 } from './parseTemplate';
 import {
   toExistingObjectives,
@@ -169,6 +170,24 @@ export interface DetectedObjectivesAnalysis {
 
 export type AnalyzeObjectivesOutcome =
   | { kind: 'error'; variant: 'validation' | 'parse'; title: string; detail: string }
+  /**
+   * The file is a valid template — just not the one for the chosen operation.
+   *
+   * Its own kind rather than an `error` variant because it is neither the file's
+   * fault nor a dead end: the same file analysed under the right operation works
+   * perfectly. It carries `suggested` so the drawer can offer the fix instead of
+   * only naming the problem, and it never reaches the error screen — the answer
+   * belongs on the screen where the operation was chosen.
+   */
+  | {
+      kind: 'mismatch';
+      /** What the user asked for. */
+      chosen: BulkUploadMode;
+      /** What the columns say the file is, when they say it clearly. */
+      suggested: BulkUploadMode | null;
+      title: string;
+      detail: string;
+    }
   | { kind: 'result'; result: DetectedObjectivesAnalysis };
 
 /** Extensions the bulk upload accepts. */
@@ -481,6 +500,70 @@ export function getImmediateValidationError(files: File[]): string | null {
   return null;
 }
 
+/**
+ * Answers whether the file the user brought is the template the operation reads.
+ *
+ * Subiendo un archivo de "actualizar" a "cargar objetivos" no pasaba nada
+ * visible: las columnas que esa operación busca no estaban, así que la revisión
+ * salía llena de filas sin meta y sin peso, y el archivo quedaba acusado de
+ * traer datos rotos cuando lo único mal era en qué pestaña se soltó.
+ *
+ * Solo se pronuncia cuando la respuesta es segura, y por eso mira dos columnas
+ * en vez de comparar la lista entera. Las tres plantillas se solapan casi por
+ * completo — `editar` es `crear` más una columna de renombre — así que "tiene
+ * las columnas de X" no prueba nada. Estas dos sí:
+ *
+ *   · `nuevo_avance` solo existe en la plantilla de actualizar.
+ *   · `nombre_objetivo_nuevo` solo existe en la de editar.
+ *
+ * De ahí las tres únicas afirmaciones que se pueden sostener, y ni una más.
+ * En particular NO se avisa cuando se elige "editar" y el archivo no trae
+ * `nombre_objetivo_nuevo`: quien no va a renombrar nada puede haber borrado esa
+ * columna, y acusarlo sería inventarse un error sobre un archivo que funciona.
+ */
+function detectTemplateMismatch(
+  mode: BulkUploadMode,
+  signature: TemplateSignature
+): AnalyzeObjectivesOutcome | null {
+  const chosenLabel = getModeConfig(mode).label;
+
+  if (signature.hasNewProgress && mode !== 'actualizar') {
+    return {
+      kind: 'mismatch',
+      chosen: mode,
+      suggested: 'actualizar',
+      title: 'Este archivo es para actualizar avances',
+      detail: `Trae la columna "nuevo_avance", que solo existe en la plantilla de Actualizar objetivos, y elegiste "${chosenLabel}". Cambia la operación y vuelve a analizarlo.`,
+    };
+  }
+
+  if (signature.hasNewTitle && mode !== 'editar') {
+    return {
+      kind: 'mismatch',
+      chosen: mode,
+      suggested: 'editar',
+      title: 'Este archivo es para editar objetivos',
+      detail: `Trae la columna "nombre_objetivo_nuevo", que solo existe en la plantilla de Editar objetivos, y elegiste "${chosenLabel}". Cambia la operación y vuelve a analizarlo.`,
+    };
+  }
+
+  if (mode === 'actualizar' && !signature.hasNewProgress) {
+    return {
+      kind: 'mismatch',
+      chosen: mode,
+      // Sin `nuevo_avance` sabemos que no es de actualizar, pero no si es de
+      // crear o de editar: la columna que los separa puede faltar por decisión
+      // de quien llenó el archivo. Proponer una de las dos sería adivinar.
+      suggested: signature.hasNewTitle ? 'editar' : null,
+      title: 'Este archivo no trae avances',
+      detail:
+        'Le falta la columna "nuevo_avance", que es el único dato que esta operación registra. Revisa si querías cargar o editar objetivos en vez de actualizar avances.',
+    };
+  }
+
+  return null;
+}
+
 /** Reads the picked files and reports what they contain. */
 export async function analyzeObjectivesFiles(
   files: File[],
@@ -565,6 +648,19 @@ export async function analyzeObjectivesFiles(
   }
 
   if (parsed.length > 0) {
+    /*
+      ¿Es esta la plantilla de la operación elegida?
+
+      Va aquí y no más arriba porque hace falta haber leído el encabezado para
+      saberlo, y antes de agrupar porque agrupar un archivo equivocado produce
+      una revisión que solo se puede tirar. Basta con que un archivo del lote lo
+      delate: si uno trae "nuevo_avance", el lote es de avances.
+    */
+    for (const result of parsed) {
+      const mismatch = detectTemplateMismatch(mode, result.signature);
+      if (mismatch) return mismatch;
+    }
+
     const objectives = parsed.flatMap((result) => result.objectives);
     // Grouping resolves the person; linking resolves the objective, and has to
     // run second because it searches inside whatever that person already has.

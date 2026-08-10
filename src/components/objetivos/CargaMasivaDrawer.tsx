@@ -42,6 +42,7 @@ import {
   hasSavedEdits,
   isObjectiveValid,
   relinkObjective,
+  type AnalyzeObjectivesOutcome,
   type BulkUploadMode,
   type DetectedObjectivesAnalysis,
   type ObjectiveUserGroup,
@@ -70,6 +71,9 @@ import {
  * wizard has nothing to show for it.
  */
 type UploadStep = 'dropzone' | 'summary' | 'error' | 'empty';
+
+/** El aviso de "este archivo es de otra operación", tal como llega del análisis. */
+type TemplateMismatch = Extract<AnalyzeObjectivesOutcome, { kind: 'mismatch' }>;
 
 /**
  * One objective as the load sees it: queued, written, or refused.
@@ -380,6 +384,14 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
   const [findings, setFindings] = React.useState<AnalysisFindings | null>(null);
   const [analysis, setAnalysis] = React.useState<DetectedObjectivesAnalysis | null>(null);
   const [error, setError] = React.useState<{ title: string; detail: string } | null>(null);
+  /**
+   * "Este archivo es de otra operación", contestado sin salir del dropzone.
+   *
+   * Vive aparte de `error` porque no es lo mismo: un error manda a su propia
+   * pantalla y termina el intento, y esto se resuelve en el sitio, con la
+   * operación que está dos dedos más arriba.
+   */
+  const [mismatch, setMismatch] = React.useState<TemplateMismatch | null>(null);
 
   /**
    * The review table's working copy. It starts as what the file said and drifts
@@ -433,6 +445,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     setFindings(null);
     setAnalysis(null);
     setError(null);
+    setMismatch(null);
     setGroups([]);
     setConfirmingDelete(false);
     setIsMinimized(false);
@@ -449,6 +462,24 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     if (next === mode) return;
     setMode(next);
     setFiles([]);
+    setMismatch(null);
+  };
+
+  /**
+   * "Sí, era de esa otra operación": cambia el modo y **conserva el archivo**.
+   *
+   * Es la única vía que no descarta la selección, y es justo lo contrario de
+   * `handleModeChange` a propósito. Ahí el archivo se tira porque cambiar de
+   * operación deja en duda si el que había sigue sirviendo; aquí no hay duda —
+   * acabamos de leer sus columnas y decir de cuál es. Volver a pedirlo sería
+   * castigar al usuario por seguir nuestra propia recomendación.
+   */
+  const applyMismatchSuggestion = (next: BulkUploadMode) => {
+    setMode(next);
+    setMismatch(null);
+    // `mode` todavía vale lo viejo en este tick, así que el análisis recibe el
+    // nuevo explícitamente en vez de leerlo del estado.
+    handleAnalyze(next);
   };
 
   /**
@@ -520,12 +551,14 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
    * alongside and drops its real counts into `findings` the moment it lands, so
    * the second half of the narration reports what was actually found.
    */
-  const handleAnalyze = () => {
+  const handleAnalyze = (overrideMode?: BulkUploadMode) => {
+    const activeMode = overrideMode ?? mode;
     setIsAnalyzing(true);
     setProgress(0);
     setFindings(null);
+    setMismatch(null);
 
-    const parsing = analyzeObjectivesFiles(files, mode, roster, directory);
+    const parsing = analyzeObjectivesFiles(files, activeMode, roster, directory);
     void parsing.then((outcome) => {
       if (outcome.kind === 'result') setFindings(summarizeFindings(outcome.result));
     });
@@ -548,6 +581,22 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
           setAnalysis(null);
           setGroups([]);
           setStep('error');
+          return;
+        }
+
+        /*
+          El archivo es una plantilla válida, pero de otra operación.
+
+          Se queda en el dropzone en vez de irse a la pantalla de error, porque
+          no hay nada roto que reparar: el archivo está bien y la operación está
+          a un clic de distancia, justo encima. Mandarlo a una pantalla aparte
+          obligaría a volver para arreglar algo que se arregla aquí.
+        */
+        if (outcome.kind === 'mismatch') {
+          setMismatch(outcome);
+          setAnalysis(null);
+          setGroups([]);
+          setTab('nueva');
           return;
         }
 
@@ -1087,7 +1136,9 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
               {step === 'dropzone' && (
                 <Button
                   disabled={files.length === 0}
-                  onClick={handleAnalyze}
+                  // Envuelto a propósito: pasarlo directo le entregaría el
+                  // MouseEvent al parámetro de modo.
+                  onClick={() => handleAnalyze()}
                   className="flex-1 gap-2.5 h-11 text-xs font-bold tracking-tight shadow-lg shadow-primary/20 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-30 disabled:grayscale"
                 >
                   <Sparkles className="h-4 w-4" />
@@ -1250,7 +1301,12 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 
               <UploadZone
                 value={files}
-                onChange={setFiles}
+                onChange={(next) => {
+                  setFiles(next);
+                  // El aviso hablaba del archivo anterior; con otro encima ya no
+                  // dice nada de lo que hay en pantalla.
+                  setMismatch(null);
+                }}
                 accept={OBJECTIVES_IMPORT_ACCEPT}
                 multiple
                 maxSizeMB={OBJECTIVES_IMPORT_MAX_MB}
@@ -1258,6 +1314,35 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                 label="Archivo de objetivos"
                 description={`Formatos aceptados: CSV, XLS y XLSX. Máximo ${OBJECTIVES_IMPORT_MAX_MB} MB.`}
               />
+
+              {/*
+                El archivo es de otra operación, dicho donde se puede arreglar.
+
+                Va debajo del dropzone y no arriba del todo porque es la
+                respuesta a lo que se acaba de soltar: se lee en el orden en que
+                pasó — elegí esto, subí aquello, y aquello no era de esto.
+              */}
+              {mismatch && (
+                <Alert variant="warning" role="status">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="text-xs font-bold text-text-primary">{mismatch.title}</p>
+                    <p className="mt-1 text-xs leading-relaxed">{mismatch.detail}</p>
+                    {mismatch.suggested && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => applyMismatchSuggestion(mismatch.suggested!)}
+                        className="mt-2.5 h-8 gap-1.5 text-[11px] font-bold rounded-lg"
+                      >
+                        <RefreshCw className="h-3 w-3" strokeWidth={2.5} />
+                        Cambiar a "{getModeConfig(mismatch.suggested).label}" y analizar
+                      </Button>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           </TabsContent>
 
