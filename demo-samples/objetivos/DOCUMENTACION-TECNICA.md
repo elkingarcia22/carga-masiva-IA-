@@ -234,24 +234,28 @@ Cambiar de operación **borra la selección de archivos** (`handleModeChange`), 
 
 **El problema que resuelve:** subir un archivo de *actualizar* con la operación *cargar objetivos* no daba error. Las columnas que esa operación busca no estaban, así que la revisión salía llena de filas sin meta y sin peso, y **el archivo quedaba acusado de traer datos rotos cuando lo único mal era en qué pestaña se soltó**.
 
-**Cuándo se dice:** justo al terminar el análisis, **sin salir de la pantalla de carga**. No va a la pantalla de error porque no hay nada roto que reparar: el archivo está bien y la operación correcta está dos dedos más arriba. Mandarlo a otra pantalla obligaría a volver para arreglar algo que se arregla ahí mismo.
-
 **El caso de uso existe solo para "actualizar"** — nunca para cargar ni para editar entre sí. Crear y editar se parecen demasiado para distinguirlos por estructura: un archivo de cualquiera de las dos puede traer objetivos nuevos o apuntar a objetivos que ya existen — no es lo que la operación pretende, pero puede pasar, y no hay columna que lo delate. `nuevo_avance` sí delata a "actualizar": ninguna otra operación la usa, así que su presencia (o su ausencia, cuando se eligió actualizar) es la única señal segura.
 
-De ahí salen **las dos únicas afirmaciones que se pueden sostener**:
+De esa única señal salen **dos comportamientos distintos, según si hay o no una corrección segura que aplicar:**
 
-| # | Situación | Mensaje | ¿Ofrece corregir? |
-|---|---|---|---|
-| M1a | El archivo trae `nuevo_avance` y la operación **no** es actualizar | **Este archivo parece ser para actualizar objetivos** — *Según la estructura del archivo, detectamos que está más enfocado a actualizar objetivos existentes que a la operación elegida. Cambia la operación y vuelve a analizarlo.* | **Sí** → *Cambiar a "Actualizar objetivos" y analizar* |
-| M1b | La operación es actualizar y al archivo le **falta** `nuevo_avance` | **Este archivo no parece ser para actualizar objetivos** — *Según la estructura del archivo, no encontramos el nuevo avance, que es el único dato que esta operación registra. Revisa si el archivo corresponde a cargar o editar objetivos.* | **No** — sin esa columna sabemos que no es de actualizar, pero no si es de crear o de editar. Proponer una de las dos sería adivinar |
+#### M1a · Corrección automática — el archivo trae `nuevo_avance` y la operación elegida no es actualizar
+
+**No pide ningún clic.** La respuesta es segura, así que el sistema **cambia la operación por su cuenta y repite el análisis con la correcta**, sin salir de la pantalla de carga y sin pasar por una pantalla de error — no hay nada roto que reparar. La tarjeta de "Actualizar objetivos" queda marcada arriba, para que la operación visible no diga una cosa mientras la revisión de abajo hace otra, y la revisión aparece directamente con una nota informativa en el mismo lugar donde salen las demás notas de lectura del archivo (§3.5):
+
+> ℹ️ *Este archivo tiene la estructura de "Actualizar objetivos", así que lo analizamos con esa operación.*
+
+#### M1b · Solo información, sin corrección — la operación es actualizar y al archivo le falta `nuevo_avance`
+
+Aquí **no hay corrección segura que ofrecer**: falta la única columna que distingue a esta operación, y de ahí no se sabe si el archivo es de crear o de editar. Proponer una de las dos sería adivinar por el usuario. El aviso se queda en la pantalla de carga, **sin botón**, y la decisión queda en sus manos — para eso están las tarjetas de operación un poco más arriba:
+
+> ⚠️ **Este archivo no parece ser para actualizar objetivos**
+> Según la estructura del archivo, no encontramos el nuevo avance, que es el único dato que esta operación registra. Revisa si el archivo corresponde a cargar o editar objetivos.
 
 > **Lo que NO se avisa, a propósito:** elegir *editar* con un archivo de *crear* (o viceversa). Ninguna columna separa esas dos operaciones con seguridad, así que el sistema no se pronuncia — pronunciarse ahí sería inventar un error sobre un archivo que puede funcionar perfectamente. Los mensajes tampoco hablan de "plantilla": hablan de la **estructura** del archivo, que es lo que de verdad se está leyendo.
 
-**El botón de corrección conserva el archivo.** Es la única vía que no descarta la selección, justo al contrario de cambiar la operación a mano. Ahí el archivo se tira porque queda en duda si sirve; aquí no hay duda — se acaban de leer sus columnas y decir de cuál es. Volver a pedirlo sería castigar al usuario por seguir la propia recomendación del sistema. Tras cambiarla, **reanaliza solo**.
+El aviso de M1b se limpia solo al cambiar de operación a mano o al soltar otro archivo: hablaba del anterior.
 
-El aviso se limpia solo al cambiar de operación a mano o al soltar otro archivo: hablaba del anterior.
-
-**Puntos de código:** `TemplateSignature` y el campo `signature` de `TemplateParseResult` (`parseTemplate.ts`) · `detectTemplateMismatch()` y la variante `kind: 'mismatch'` de `AnalyzeObjectivesOutcome` (`index.ts`) · el estado `mismatch` y `applyMismatchSuggestion()` (`CargaMasivaDrawer.tsx`).
+**Puntos de código:** `TemplateSignature` y el campo `signature` de `TemplateParseResult` (`parseTemplate.ts`) · `detectTemplateMismatch()` y la variante `kind: 'mismatch'` de `AnalyzeObjectivesOutcome` (`index.ts`) · dentro de `handleAnalyze()`, el `.then()` que reintenta el análisis con `outcome.suggested` y antepone la nota a `analysis.notes`; el estado `mismatch` solo para M1b (`CargaMasivaDrawer.tsx`).
 
 ### 4.2 Lo que hace única a "Actualizar"
 
@@ -1094,18 +1098,18 @@ No hace falta un archivo nuevo: se reproduce con los que ya hay. El caso solo ex
 
 | Operación a elegir | Archivo a subir | Qué debe pasar |
 |---|---|---|
-| **Cargar objetivos** | `7 - Actualizar - happy path.xlsx` | Al terminar el análisis vuelve a la pantalla de carga con **"Este archivo parece ser para actualizar objetivos"** y el botón *Cambiar a "Actualizar objetivos" y analizar* |
-| **Editar objetivos** | `7 - Actualizar - happy path.xlsx` | Igual mensaje: `nuevo_avance` presente y la operación no es actualizar |
-| **Actualizar objetivos** | `1 - Crear - happy path.xlsx` | **"Este archivo no parece ser para actualizar objetivos"**, **sin botón** — no se puede saber si era de crear o de editar |
-| **Actualizar objetivos** | `4 - Editar - happy path.xlsx` | Mismo mensaje y tampoco hay botón: falta `nuevo_avance`, y de ahí no se distingue crear de editar |
+| **Cargar objetivos** | `7 - Actualizar - happy path.xlsx` | **Sin ningún clic**: cambia solo a "Actualizar objetivos" (queda marcada arriba) y llega a la revisión con la nota *"Este archivo tiene la estructura de 'Actualizar objetivos', así que lo analizamos con esa operación."* |
+| **Editar objetivos** | `7 - Actualizar - happy path.xlsx` | Igual: `nuevo_avance` presente y la operación no es actualizar → corrige sola |
+| **Actualizar objetivos** | `1 - Crear - happy path.xlsx` | Se queda en la pantalla de carga con **"Este archivo no parece ser para actualizar objetivos"**, **sin botón** — no se puede saber si era de crear o de editar |
+| **Actualizar objetivos** | `4 - Editar - happy path.xlsx` | Mismo aviso y tampoco hay botón: falta `nuevo_avance`, y de ahí no se distingue crear de editar |
 
 **Qué más probar:**
 
 | Acción | Resultado esperado |
 |---|---|
-| Pulsar el botón de corrección (solo aparece en la fila 1 y 2) | Cambia a "Actualizar objetivos", **conserva el archivo** y reanaliza solo, hasta la revisión |
-| Cambiar la operación a mano con el aviso en pantalla | El aviso desaparece **y el archivo se descarta** (es la ruta que sí duda) |
-| Soltar otro archivo con el aviso en pantalla | El aviso desaparece: hablaba del anterior |
+| Filas 1 y 2 de la tabla | Llegan **directo a la revisión**, sin pasar por ningún aviso ni botón — el cambio de operación es automático |
+| Cambiar la operación a mano con el aviso de la fila 3 o 4 en pantalla | El aviso desaparece **y el archivo se descarta** |
+| Soltar otro archivo con ese aviso en pantalla | El aviso desaparece: hablaba del anterior |
 | **Editar objetivos** + `1 - Crear - happy path.xlsx` | **No avisa nada** — pasa directo a la revisión, con cada fila marcada "Nuevo objetivo" |
 | **Cargar objetivos** + `4 - Editar - happy path.xlsx` | **No avisa nada** — pasa directo a la revisión |
 | Subir cada archivo en **su propia** operación | **No aparece ningún aviso** — pasa directo a la revisión |

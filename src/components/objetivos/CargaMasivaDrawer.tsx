@@ -465,22 +465,6 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     setMismatch(null);
   };
 
-  /**
-   * "Sí, era de esa otra operación": cambia el modo y **conserva el archivo**.
-   *
-   * Es la única vía que no descarta la selección, y es justo lo contrario de
-   * `handleModeChange` a propósito. Ahí el archivo se tira porque cambiar de
-   * operación deja en duda si el que había sigue sirviendo; aquí no hay duda —
-   * acabamos de leer sus columnas y decir de cuál es. Volver a pedirlo sería
-   * castigar al usuario por seguir nuestra propia recomendación.
-   */
-  const applyMismatchSuggestion = (next: BulkUploadMode) => {
-    setMode(next);
-    setMismatch(null);
-    // `mode` todavía vale lo viejo en este tick, así que el análisis recibe el
-    // nuevo explícitamente en vez de leerlo del estado.
-    handleAnalyze(next);
-  };
 
   /**
    * A review in progress is worth protecting; an untouched dropzone is not.
@@ -558,7 +542,36 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     setFindings(null);
     setMismatch(null);
 
-    const parsing = analyzeObjectivesFiles(files, activeMode, roster, directory);
+    /*
+      Cuando la estructura sí permite saber la operación correcta — hoy, solo
+      hacia "actualizar" — el sistema cambia por su cuenta y vuelve a analizar
+      con ella. No hay nada que confirmar: la respuesta ya es segura, así que
+      pedirle un clic al usuario solo repetiría un paso que ya se puede dar
+      solo. La operación visible arriba se actualiza para que no quede
+      diciendo una cosa mientras la revisión de abajo hace otra.
+    */
+    const parsing = analyzeObjectivesFiles(files, activeMode, roster, directory).then(
+      (outcome): Promise<AnalyzeObjectivesOutcome> | AnalyzeObjectivesOutcome => {
+        if (outcome.kind !== 'mismatch' || !outcome.suggested) return outcome;
+
+        const correctedMode = outcome.suggested;
+        setMode(correctedMode);
+        return analyzeObjectivesFiles(files, correctedMode, roster, directory).then((resolved) =>
+          resolved.kind === 'result'
+            ? {
+                kind: 'result',
+                result: {
+                  ...resolved.result,
+                  notes: [
+                    `Este archivo tiene la estructura de "${getModeConfig(correctedMode).label}", así que lo analizamos con esa operación.`,
+                    ...resolved.result.notes,
+                  ],
+                },
+              }
+            : resolved
+        );
+      }
+    );
     void parsing.then((outcome) => {
       if (outcome.kind === 'result') setFindings(summarizeFindings(outcome.result));
     });
@@ -585,12 +598,13 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
         }
 
         /*
-          El archivo es una plantilla válida, pero de otra operación.
-
-          Se queda en el dropzone en vez de irse a la pantalla de error, porque
-          no hay nada roto que reparar: el archivo está bien y la operación está
-          a un clic de distancia, justo encima. Mandarlo a una pantalla aparte
-          obligaría a volver para arreglar algo que se arregla aquí.
+          Lo único que todavía llega hasta aquí como "mismatch" es el caso sin
+          corrección posible: se eligió actualizar y al archivo le falta
+          nuevo_avance, así que no hay manera de saber si es de crear o de
+          editar. Se queda en el dropzone y no en la pantalla de error porque
+          no hay nada roto que reparar — el archivo puede ser válido para otra
+          operación, y esa operación está a un clic de distancia, justo
+          encima.
         */
         if (outcome.kind === 'mismatch') {
           setMismatch(outcome);
@@ -1316,11 +1330,15 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
               />
 
               {/*
-                El archivo es de otra operación, dicho donde se puede arreglar.
+                Sin nuevo_avance y con "actualizar" elegido, dicho donde se
+                puede arreglar.
 
-                Va debajo del dropzone y no arriba del todo porque es la
-                respuesta a lo que se acaba de soltar: se lee en el orden en que
-                pasó — elegí esto, subí aquello, y aquello no era de esto.
+                Sin botón, porque no hay corrección segura que ofrecer: falta
+                la única columna que distingue a esta operación, y de ahí no
+                se sabe si el archivo es de crear o de editar. Proponer una de
+                las dos sería adivinar por el usuario, así que la respuesta
+                queda en sus manos — para eso están las tarjetas de operación
+                un poco más arriba.
               */}
               {mismatch && (
                 <Alert variant="warning" role="status">
@@ -1328,18 +1346,6 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                   <AlertDescription>
                     <p className="text-xs font-bold text-text-primary">{mismatch.title}</p>
                     <p className="mt-1 text-xs leading-relaxed">{mismatch.detail}</p>
-                    {mismatch.suggested && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => applyMismatchSuggestion(mismatch.suggested!)}
-                        className="mt-2.5 h-8 gap-1.5 text-[11px] font-bold rounded-lg"
-                      >
-                        <RefreshCw className="h-3 w-3" strokeWidth={2.5} />
-                        Cambiar a "{getModeConfig(mismatch.suggested).label}" y analizar
-                      </Button>
-                    )}
                   </AlertDescription>
                 </Alert>
               )}
