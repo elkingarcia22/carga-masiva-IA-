@@ -501,49 +501,33 @@ export function getImmediateValidationError(files: File[]): string | null {
 }
 
 /**
- * Answers whether the file the user brought is the template the operation reads.
+ * Answers si la estructura del archivo corresponde a "actualizar objetivos".
  *
  * Subiendo un archivo de "actualizar" a "cargar objetivos" no pasaba nada
  * visible: las columnas que esa operación busca no estaban, así que la revisión
  * salía llena de filas sin meta y sin peso, y el archivo quedaba acusado de
  * traer datos rotos cuando lo único mal era en qué pestaña se soltó.
  *
- * Solo se pronuncia cuando la respuesta es segura, y por eso mira dos columnas
- * en vez de comparar la lista entera. Las tres plantillas se solapan casi por
- * completo — `editar` es `crear` más una columna de renombre — así que "tiene
- * las columnas de X" no prueba nada. Estas dos sí:
- *
- *   · `nuevo_avance` solo existe en la plantilla de actualizar.
- *   · `nombre_objetivo_nuevo` solo existe en la de editar.
- *
- * De ahí las tres únicas afirmaciones que se pueden sostener, y ni una más.
- * En particular NO se avisa cuando se elige "editar" y el archivo no trae
- * `nombre_objetivo_nuevo`: quien no va a renombrar nada puede haber borrado esa
- * columna, y acusarlo sería inventarse un error sobre un archivo que funciona.
+ * El caso de uso existe **solo para "actualizar"**, en ninguna de las otras dos
+ * direcciones. Crear y editar se parecen demasiado entre sí para distinguirlos
+ * por estructura: un archivo de cualquiera de las dos puede traer objetivos
+ * nuevos o apuntar a objetivos que ya existen — eso no es lo que la operación
+ * pretende, pero puede pasar, y no hay columna que lo delate. `nuevo_avance` sí
+ * delata a "actualizar": ninguna otra operación la usa, así que su presencia (o
+ * su ausencia, cuando se eligió actualizar) es la única señal segura.
  */
 function detectTemplateMismatch(
   mode: BulkUploadMode,
   signature: TemplateSignature
 ): AnalyzeObjectivesOutcome | null {
-  const chosenLabel = getModeConfig(mode).label;
-
   if (signature.hasNewProgress && mode !== 'actualizar') {
     return {
       kind: 'mismatch',
       chosen: mode,
       suggested: 'actualizar',
-      title: 'Este archivo es para actualizar avances',
-      detail: `Trae la columna "nuevo_avance", que solo existe en la plantilla de Actualizar objetivos, y elegiste "${chosenLabel}". Cambia la operación y vuelve a analizarlo.`,
-    };
-  }
-
-  if (signature.hasNewTitle && mode !== 'editar') {
-    return {
-      kind: 'mismatch',
-      chosen: mode,
-      suggested: 'editar',
-      title: 'Este archivo es para editar objetivos',
-      detail: `Trae la columna "nombre_objetivo_nuevo", que solo existe en la plantilla de Editar objetivos, y elegiste "${chosenLabel}". Cambia la operación y vuelve a analizarlo.`,
+      title: 'Este archivo parece ser para actualizar objetivos',
+      detail:
+        'Según la estructura del archivo, detectamos que está más enfocado a actualizar objetivos existentes que a la operación elegida. Cambia la operación y vuelve a analizarlo.',
     };
   }
 
@@ -551,13 +535,10 @@ function detectTemplateMismatch(
     return {
       kind: 'mismatch',
       chosen: mode,
-      // Sin `nuevo_avance` sabemos que no es de actualizar, pero no si es de
-      // crear o de editar: la columna que los separa puede faltar por decisión
-      // de quien llenó el archivo. Proponer una de las dos sería adivinar.
-      suggested: signature.hasNewTitle ? 'editar' : null,
-      title: 'Este archivo no trae avances',
+      suggested: null,
+      title: 'Este archivo no parece ser para actualizar objetivos',
       detail:
-        'Le falta la columna "nuevo_avance", que es el único dato que esta operación registra. Revisa si querías cargar o editar objetivos en vez de actualizar avances.',
+        'Según la estructura del archivo, no encontramos el nuevo avance, que es el único dato que esta operación registra. Revisa si el archivo corresponde a cargar o editar objetivos.',
     };
   }
 

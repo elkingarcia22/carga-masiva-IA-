@@ -236,22 +236,16 @@ Cambiar de operación **borra la selección de archivos** (`handleModeChange`), 
 
 **Cuándo se dice:** justo al terminar el análisis, **sin salir de la pantalla de carga**. No va a la pantalla de error porque no hay nada roto que reparar: el archivo está bien y la operación correcta está dos dedos más arriba. Mandarlo a otra pantalla obligaría a volver para arreglar algo que se arregla ahí mismo.
 
-**Cómo se detecta.** Solo se miran **dos columnas**, no la lista entera. Las tres plantillas se solapan casi por completo — `editar` es `crear` más una columna de renombre — así que *"tiene las columnas de X"* no prueba nada. Estas dos sí, porque existen en una sola plantilla:
+**El caso de uso existe solo para "actualizar"** — nunca para cargar ni para editar entre sí. Crear y editar se parecen demasiado para distinguirlos por estructura: un archivo de cualquiera de las dos puede traer objetivos nuevos o apuntar a objetivos que ya existen — no es lo que la operación pretende, pero puede pasar, y no hay columna que lo delate. `nuevo_avance` sí delata a "actualizar": ninguna otra operación la usa, así que su presencia (o su ausencia, cuando se eligió actualizar) es la única señal segura.
 
-| Columna | Solo existe en |
-|---|---|
-| `nuevo_avance` | Actualizar objetivos |
-| `nombre_objetivo_nuevo` | Editar objetivos |
-
-De ahí salen **las tres únicas afirmaciones que se pueden sostener**:
+De ahí salen **las dos únicas afirmaciones que se pueden sostener**:
 
 | # | Situación | Mensaje | ¿Ofrece corregir? |
 |---|---|---|---|
-| M1a | El archivo trae `nuevo_avance` y la operación **no** es actualizar | **Este archivo es para actualizar avances** — *Trae la columna "nuevo_avance", que solo existe en la plantilla de Actualizar objetivos, y elegiste "{operación}". Cambia la operación y vuelve a analizarlo.* | **Sí** → *Cambiar a "Actualizar objetivos" y analizar* |
-| M1b | El archivo trae `nombre_objetivo_nuevo` y la operación **no** es editar | **Este archivo es para editar objetivos** — *Trae la columna "nombre_objetivo_nuevo", que solo existe en la plantilla de Editar objetivos, y elegiste "{operación}".* | **Sí** → *Cambiar a "Editar objetivos" y analizar* |
-| M1c | La operación es actualizar y al archivo le **falta** `nuevo_avance` | **Este archivo no trae avances** — *Le falta la columna "nuevo_avance", que es el único dato que esta operación registra. Revisa si querías cargar o editar objetivos en vez de actualizar avances.* | **No** — sin esa columna sabemos que no es de actualizar, pero no si es de crear o de editar. Proponer una de las dos sería adivinar |
+| M1a | El archivo trae `nuevo_avance` y la operación **no** es actualizar | **Este archivo parece ser para actualizar objetivos** — *Según la estructura del archivo, detectamos que está más enfocado a actualizar objetivos existentes que a la operación elegida. Cambia la operación y vuelve a analizarlo.* | **Sí** → *Cambiar a "Actualizar objetivos" y analizar* |
+| M1b | La operación es actualizar y al archivo le **falta** `nuevo_avance` | **Este archivo no parece ser para actualizar objetivos** — *Según la estructura del archivo, no encontramos el nuevo avance, que es el único dato que esta operación registra. Revisa si el archivo corresponde a cargar o editar objetivos.* | **No** — sin esa columna sabemos que no es de actualizar, pero no si es de crear o de editar. Proponer una de las dos sería adivinar |
 
-> **Lo que NO se avisa, a propósito:** elegir *editar* y subir un archivo sin `nombre_objetivo_nuevo`. Quien no va a renombrar nada puede haber borrado esa columna, y acusarlo sería inventarse un error sobre un archivo que funciona. La regla es no pronunciarse salvo que la respuesta sea segura.
+> **Lo que NO se avisa, a propósito:** elegir *editar* con un archivo de *crear* (o viceversa). Ninguna columna separa esas dos operaciones con seguridad, así que el sistema no se pronuncia — pronunciarse ahí sería inventar un error sobre un archivo que puede funcionar perfectamente. Los mensajes tampoco hablan de "plantilla": hablan de la **estructura** del archivo, que es lo que de verdad se está leyendo.
 
 **El botón de corrección conserva el archivo.** Es la única vía que no descarta la selección, justo al contrario de cambiar la operación a mano. Ahí el archivo se tira porque queda en duda si sirve; aquí no hay duda — se acaban de leer sus columnas y decir de cuál es. Volver a pedirlo sería castigar al usuario por seguir la propia recomendación del sistema. Tras cambiarla, **reanaliza solo**.
 
@@ -1094,27 +1088,27 @@ Uno por operación, y ahí sí hace falta: para llegar al momento de escribir ha
 
 ---
 
-### 13.11 Archivo con la operación equivocada (M1)
+### 13.11 Archivo que no es de "actualizar" (M1)
 
-No hace falta un archivo nuevo: se reproduce con los que ya hay, subiéndolos en la operación que no les toca.
+No hace falta un archivo nuevo: se reproduce con los que ya hay. El caso solo existe alrededor de "Actualizar objetivos" — nunca entre cargar y editar.
 
 | Operación a elegir | Archivo a subir | Qué debe pasar |
 |---|---|---|
-| **Cargar objetivos** | `7 - Actualizar - happy path.xlsx` | Al terminar el análisis vuelve a la pantalla de carga con **"Este archivo es para actualizar avances"** y el botón *Cambiar a "Actualizar objetivos" y analizar* |
-| **Editar objetivos** | `7 - Actualizar - happy path.xlsx` | Igual: gana `nuevo_avance` sobre cualquier otra señal |
-| **Cargar objetivos** | `4 - Editar - happy path.xlsx` | **"Este archivo es para editar objetivos"** + botón a *Editar objetivos* |
-| **Actualizar objetivos** | `1 - Crear - happy path.xlsx` | **"Este archivo no trae avances"**, y **sin botón** — no se puede saber si era de crear o de editar |
-| **Actualizar objetivos** | `4 - Editar - happy path.xlsx` | Mismo mensaje, pero **sí** ofrece botón a *Editar objetivos*: el archivo trae `nombre_objetivo_nuevo` |
+| **Cargar objetivos** | `7 - Actualizar - happy path.xlsx` | Al terminar el análisis vuelve a la pantalla de carga con **"Este archivo parece ser para actualizar objetivos"** y el botón *Cambiar a "Actualizar objetivos" y analizar* |
+| **Editar objetivos** | `7 - Actualizar - happy path.xlsx` | Igual mensaje: `nuevo_avance` presente y la operación no es actualizar |
+| **Actualizar objetivos** | `1 - Crear - happy path.xlsx` | **"Este archivo no parece ser para actualizar objetivos"**, **sin botón** — no se puede saber si era de crear o de editar |
+| **Actualizar objetivos** | `4 - Editar - happy path.xlsx` | Mismo mensaje y tampoco hay botón: falta `nuevo_avance`, y de ahí no se distingue crear de editar |
 
 **Qué más probar:**
 
 | Acción | Resultado esperado |
 |---|---|
-| Pulsar el botón de corrección | Cambia la operación, **conserva el archivo** y reanaliza solo, hasta la revisión |
+| Pulsar el botón de corrección (solo aparece en la fila 1 y 2) | Cambia a "Actualizar objetivos", **conserva el archivo** y reanaliza solo, hasta la revisión |
 | Cambiar la operación a mano con el aviso en pantalla | El aviso desaparece **y el archivo se descarta** (es la ruta que sí duda) |
 | Soltar otro archivo con el aviso en pantalla | El aviso desaparece: hablaba del anterior |
-| Subir cada archivo en **su** operación | **No aparece ningún aviso** — pasa directo a la revisión |
-| **Editar objetivos** + un archivo sin `nombre_objetivo_nuevo` | **No avisa**, a propósito: quien no renombra nada puede haber borrado esa columna |
+| **Editar objetivos** + `1 - Crear - happy path.xlsx` | **No avisa nada** — pasa directo a la revisión, con cada fila marcada "Nuevo objetivo" |
+| **Cargar objetivos** + `4 - Editar - happy path.xlsx` | **No avisa nada** — pasa directo a la revisión |
+| Subir cada archivo en **su propia** operación | **No aparece ningún aviso** — pasa directo a la revisión |
 
 ### 13.12 Casos que se prueban editando, no subiendo
 
