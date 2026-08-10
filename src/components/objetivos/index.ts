@@ -6,3 +6,5 @@ export * from "./AssignedUserCells";
 export * from "./progressFormat";
 export * from "./pageSize";
 export * from "./CargaMasivaDrawer";
+export * from "./ObjectivesReviewTable";
+export * from "./UserMatchPicker";

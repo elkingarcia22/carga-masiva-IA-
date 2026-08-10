@@ -3,6 +3,8 @@
  * Aligned with component props and UBITS design system
  */
 
+import type { CycleObjective } from '@/lib/objectivesImport';
+
 /**
  * Core metric data shape for KPI cards
  */
@@ -238,10 +240,34 @@ export interface AssignedUser {
   username: string;
   name: string;
   email: string;
+  /**
+   * Area and leader are not shown in the cycle table, but the bulk upload needs
+   * them: when a file identifier resolves to a person, these are what let a
+   * reviewer confirm it is the right one before loading anything.
+   */
+  area?: string;
+  leader?: string;
+  /**
+   * Contact number. Same reason as area and leader — the bulk upload can be
+   * handed a file that names people by phone, and it has to be able to propose
+   * a candidate for one.
+   */
+  phone?: string;
   status: AssignedUserStatus;
   objectivesCount: number;
   /** Share of the cycle's total weight this user carries. */
   weightPercent: number;
+  /**
+   * The objectives themselves, when this user's are spelled out.
+   *
+   * Only the people the bulk-upload demo needs to collide with carry them: a
+   * file that adds objectives to somebody who already has some can push their
+   * weights past 100%, and the review step can only show that — and let the
+   * reviewer rebalance it — if it knows what those objectives are. Everyone else
+   * is summarised by `objectivesCount` alone, which is all the roster table
+   * needs.
+   */
+  cycleObjectives?: CycleObjective[];
   /**
    * Weighted completion across the user's objectives, split into the part
    * already closed out and the part still moving — the two segments the

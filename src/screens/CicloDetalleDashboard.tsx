@@ -50,6 +50,7 @@ import {
 import {
   ASSIGNED_USER_STATUSES,
   PERFORMANCE_LEVELS,
+  UBITS_DIRECTORY,
   getAssignedUsers,
 } from "@/mocks/objetivosMocks";
 import type { AssignedUser, ObjectiveCycleItem } from "@/mocks/types";
@@ -117,8 +118,30 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
     [filteredUsers, safePage, pageSize]
   );
 
-  /** What the uploaded file's rows are matched against. */
-  const rosterIdentifiers = React.useMemo(() => users.map((user) => user.username), [users]);
+  /**
+   * What the uploaded file's rows are matched against. The e-mail travels with
+   * the username because UBITS accepts either one in the file's `username`
+   * column, so both have to be searchable.
+   *
+   * The objectives each person already has in this cycle travel too, when the
+   * roster knows them. The 100% weight rule is about everything somebody
+   * carries, not about what one file brings, so a load against a user who is
+   * already at 100% has to be able to say so — and let the reviewer rebalance
+   * both halves — rather than fail at write time.
+   */
+  const roster = React.useMemo(
+    () =>
+      users.map((user) => ({
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        area: user.area,
+        leader: user.leader,
+        phone: user.phone,
+        cycleObjectives: user.cycleObjectives,
+      })),
+    [users]
+  );
 
   const hasActiveFilters =
     statusFilters.length > 0 || performanceFilters.length > 0 || searchQuery !== "";
@@ -380,7 +403,8 @@ export const CicloDetalleDashboard: React.FC<CicloDetalleDashboardProps> = ({ cy
         open={isCargaMasivaOpen}
         onOpenChange={setCargaMasivaOpen}
         cycleName={cycle.name}
-        rosterIdentifiers={rosterIdentifiers}
+        roster={roster}
+        directory={UBITS_DIRECTORY}
         // Silent reload: the drawer already reports the result, and a second
         // "list updated" toast on top of it is just noise.
         onUploaded={reloadRoster}

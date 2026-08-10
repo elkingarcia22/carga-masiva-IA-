@@ -23,6 +23,49 @@ export function getFileExtension(fileName: string): string {
 }
 
 /**
+ * Human-readable list of what an `accept` string actually allows.
+ *
+ * Derived instead of written by hand because the message it feeds is shown by
+ * every upload zone in the app and they do not accept the same things: the
+ * surveys one takes PDFs and images, the objectives one takes spreadsheets
+ * only. A fixed sentence is wrong for one of them by construction, and telling
+ * somebody a PDF would work when the dropzone will refuse it too is worse than
+ * saying nothing.
+ */
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.heic']
+
+/** Extensions that roll up into a family name rather than being listed one by one. */
+const ACCEPT_FAMILIES: Array<{ label: string; matches: string[] }> = [
+  { label: 'Excel', matches: ['.xlsx', '.xls'] },
+  { label: 'CSV', matches: ['.csv'] },
+  { label: 'PDF', matches: ['.pdf'] },
+  { label: 'imágenes', matches: IMAGE_EXTENSIONS },
+]
+
+function describeAccepted(accept: string): string {
+  const types = accept.split(',').map((entry) => entry.trim().toLowerCase())
+  const labels: string[] = []
+
+  ACCEPT_FAMILIES.forEach(({ label, matches }) => {
+    const matchesImages = label === 'imágenes' && types.some((type) => type.startsWith('image/'))
+    if (matchesImages || matches.some((extension) => types.includes(extension))) {
+      labels.push(label)
+    }
+  })
+
+  // Anything no family claims is named by its own extension, so a newly
+  // accepted type never silently drops out of the message.
+  const claimed = new Set(ACCEPT_FAMILIES.flatMap((family) => family.matches))
+  types
+    .filter((type) => type.startsWith('.') && !claimed.has(type))
+    .forEach((type) => labels.push(type))
+
+  if (labels.length === 0) return ''
+  if (labels.length === 1) return labels[0]
+  return `${labels.slice(0, -1).join(', ')} o ${labels[labels.length - 1]}`
+}
+
+/**
  * Validate a list of files against rules.
  */
 export function validateFiles(
@@ -69,9 +112,12 @@ export function validateFiles(
       })
 
       if (!isAccepted) {
+        const accepted = describeAccepted(accept)
         return {
           isValid: false,
-          error: `El tipo de archivo "${extension}" no está permitido. Acepta Excel, CSV, PDF o imágenes.`
+          error: accepted
+            ? `El tipo de archivo "${extension}" no está permitido. Acepta ${accepted}.`
+            : `El tipo de archivo "${extension}" no está permitido.`
         }
       }
     }

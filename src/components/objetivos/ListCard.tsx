@@ -2,6 +2,13 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PAGE_SIZE_OPTIONS } from "./pageSize";
 
 /**
@@ -100,22 +107,34 @@ const ListPagination: React.FC<PaginationProps> = ({
           Mostrando {firstItem}-{lastItem} de {totalItems.toLocaleString('es-CO')}
         </span>
         {onPageSizeChange && (
-          <label className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary/40 whitespace-nowrap">
-            <span className="sr-only">Filas por página</span>
-            <select
-              value={pageSize}
-              onChange={(event) => onPageSizeChange(Number(event.target.value))}
-              aria-label="Filas por página"
-              className="h-7 pl-2 pr-1 rounded-lg border border-border/60 bg-surface text-[11px] font-bold text-text-secondary tabular-nums cursor-pointer transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary/40 whitespace-nowrap">
+            {/* Our Select, not the browser's: this footer sits under every list
+                in the module, so the one control that was rendering as an OS
+                dropdown was also the most repeated. */}
+            <Select
+              value={String(pageSize)}
+              onValueChange={(next) => onPageSizeChange(Number(next))}
             >
-              {PAGE_SIZE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                aria-label="Filas por página"
+                className="h-7 w-auto gap-1 pl-2 pr-1.5 rounded-lg border-border/60 bg-surface text-[11px] font-bold text-text-secondary tabular-nums [&>svg]:size-3"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem
+                    key={option}
+                    value={String(option)}
+                    className="text-[11px] font-bold tabular-nums"
+                  >
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             por página
-          </label>
+          </div>
         )}
       </div>
       <div className="flex items-center gap-2">

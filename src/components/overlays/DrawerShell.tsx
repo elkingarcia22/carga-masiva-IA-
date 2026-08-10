@@ -120,8 +120,18 @@ export function DrawerShell({
         showCloseButton={showCloseButton}
         aria-describedby={undefined}
       >
+        {/*
+          The header stops just short of the close button.
+
+          SheetContent pins that button at `top-3 right-3`, so it occupies the
+          40px nearest the edge; 68px of padding clears it and leaves a ~28px
+          gap, which is enough to read as deliberate without stranding a third
+          of the header empty. An earlier attempt also capped the description at
+          85ch, and on an 86vw drawer that left half the row blank — the fix for
+          a long subtitle is a shorter subtitle, not a narrower column.
+        */}
         {(title || description) && (
-          <SheetHeader className="border-b bg-background">
+          <SheetHeader className="border-b bg-background pr-[68px]">
             {title && <SheetTitle>{title}</SheetTitle>}
             {description && <SheetDescription>{description}</SheetDescription>}
           </SheetHeader>
