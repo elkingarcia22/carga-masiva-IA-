@@ -182,7 +182,7 @@ const TAB_META: Record<
    * review reveals them the moment a user is picked.
    */
   sinAlinear: {
-    label: "Sin alinear",
+    label: "Usuarios sin alinear",
     listTitle: "Lista de usuarios sin alinear",
     emptyTitle: "Todos los usuarios están alineados",
     empty:
@@ -191,15 +191,15 @@ const TAB_META: Record<
   // The bucket key stays `asociaciones` while the label follows the product's
   // wording: it holds proposals waiting on a human either way.
   asociaciones: {
-    label: "Posible alineación",
-    listTitle: "Lista de usuarios con posible alineación",
+    label: "Alineación sugerida de usuarios",
+    listTitle: "Lista de usuarios con alineación sugerida",
     emptyTitle: "No hay nada por confirmar",
     empty:
       "Todos los identificadores del archivo coincidieron por username, correo o documento, así que ninguno quedó como propuesta.",
   },
   errores: {
-    label: "Con errores",
-    listTitle: "Lista de usuarios con errores",
+    label: "Objetivos con errores",
+    listTitle: "Lista de objetivos con errores",
     emptyTitle: "Ningún dato por corregir",
     empty:
       "Los pesos suman 100% y ninguna fila con usuario tiene datos que UBITS vaya a rechazar.",
@@ -210,8 +210,8 @@ const TAB_META: Record<
       whose empty state points back at the work instead of congratulating the
       reviewer for having none left.
     */
-    label: "Alineados",
-    listTitle: "Lista de objetivos alineados",
+    label: "Objetivos listos para cargar",
+    listTitle: "Lista de objetivos listos para cargar",
     emptyTitle: "Todavía no hay nada listo para cargar",
     empty:
       "Ningún usuario tiene a la vez su persona resuelta, sus datos válidos y sus pesos en 100%. Revisa las otras pestañas.",
@@ -300,7 +300,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
     [groups]
   );
 
-  /** Opens on the tab that actually has work rather than always on "Alineados". */
+  /** Opens on the tab that actually has work rather than always on "Objetivos listos para cargar". */
   const [selectedTab, setSelectedTab] = React.useState<GroupBucket>(() => {
     const initial = groups.reduce<Record<GroupBucket, number>>(
       (counts, group) => {
@@ -569,7 +569,12 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
         aria-label="Estado de los usuarios detectados"
         inert={isConfirming || undefined}
         className={cn(
-          "shrink-0 grid grid-cols-4 w-full h-11 p-1 gap-1 rounded-xl bg-surface-muted transition-opacity",
+          /* Flex, not four equal columns. The labels name what each tab holds
+             ("Alineación sugerida de usuarios" against "Objetivos con
+             errores"), so they differ in length by half again; equal columns
+             sized the strip to the longest one and truncated it anyway on a
+             narrower window while the short tabs sat on empty space. */
+          "shrink-0 flex w-full h-11 p-1 gap-1 rounded-xl bg-surface-muted transition-opacity",
           isConfirming && "opacity-50"
         )}
       >
@@ -586,7 +591,10 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
               aria-selected={isActive}
               onClick={() => switchTab(bucket)}
               className={cn(
-                "flex items-center justify-center gap-2 h-full px-2 rounded-lg text-[13px] font-bold tracking-tight transition-all",
+                /* `flex-auto`, not `flex-1`: every tab still grows into the
+                   leftover track, but starting from its own text width instead
+                   of from zero, so the long labels get the room they need. */
+                "flex-auto min-w-0 flex items-center justify-center gap-2 h-full px-2 rounded-lg text-[13px] font-bold tracking-tight transition-all",
                 isActive
                   ? "bg-surface shadow-sm text-primary"
                   : "text-text-secondary/70 hover:text-text-primary"
@@ -782,7 +790,8 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
 
           A tab that is empty because the work is done is good news and says so
           with a tick. A tab that is empty because the filters hid everything is
-          the reviewer's own doing and offers the way back. And "Alineados" empty
+          the reviewer's own doing and offers the way back. And "Objetivos listos
+          para cargar" empty
           is neither — it means nothing can load yet, which is the one case worth
           a warning rather than a reassurance.
         */
@@ -854,8 +863,8 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                * question for after that, and answering both at once was what
                * made the old error tab unreadable. Nothing is lost by waiting —
                * picking the user re-runs every rule and drops the card into
-               * "Con errores" if the numbers are wrong, or into "Alineados" if
-               * they are not.
+               * "Con errores" if the numbers are wrong, or into "Objetivos
+               * listos para cargar" if they are not.
                */
               const isAwaitingUser = group.matchStatus === "unmatched";
 

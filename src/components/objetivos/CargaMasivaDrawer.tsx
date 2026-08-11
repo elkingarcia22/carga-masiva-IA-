@@ -698,7 +698,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
    * `assignUser` doubles as this for a card still settling who it is; this is
    * the twin for the one case that has nothing left to settle but the data.
    * See `reviewConfirmed`'s doc comment for why a card does not reach
-   * "Alineados" any other way.
+   * "Objetivos listos para cargar" any other way.
    */
   const confirmGroupReady = (identifier: string) => {
     setGroups((current) =>
@@ -837,7 +837,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     [groups]
   );
 
-  /** Everyone still short of "Alineados", for the tray's one-line status. */
+  /** Everyone still short of "Objetivos listos para cargar", for the tray's one-line status. */
   const remainingUsers =
     usersByBucket.sinAlinear + usersByBucket.asociaciones + usersByBucket.errores;
 
@@ -949,7 +949,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
      * `analysis.groups` is the parse exactly as it landed, untouched by
      * anything the reviewer fixed afterwards — so it still says which demo
      * file this was. The happy-path sample parses with everyone already in
-     * "Alineados"; the three-states sample starts with rows in every other
+     * "Objetivos listos para cargar"; the three-states sample starts with rows in every other
      * tab. A file that arrived clean should load clean end to end, or the
      * "happy path" demo would still show random write failures for no visible
      * reason. A file built to exercise every error state gets to exercise the
@@ -1036,7 +1036,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
    */
   const description =
     step === 'summary'
-      ? "Cada usuario está en una pestaña según lo que le falta: alinear la persona, confirmarla o corregir datos. Al resolverlo pasa solo a la siguiente, y solo se cargan los de “Alineados”."
+      ? "Cada usuario está en una pestaña según lo que le falta: alinear la persona, confirmarla o corregir datos. Al resolverlo pasa solo a la siguiente, y solo se cargan los de “Objetivos listos para cargar”."
     : step === 'error' ? "Revisa el archivo e inténtalo de nuevo."
     : step === 'empty' ? "No pudimos detectar objetivos en este archivo."
     : "Elige qué quieres hacer y sube el archivo, o revisa tus cargas recientes.";
@@ -1192,7 +1192,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                     onClick={handleConfirm}
                     title={
                       readyObjectives === 0
-                        ? 'Resuelve al menos un usuario en la pestaña "Alineados" para poder cargar'
+                        ? 'Resuelve al menos un usuario en la pestaña "Objetivos listos para cargar" para poder cargar'
                         : undefined
                     }
                     className="gap-2.5 h-11 px-5 text-xs font-bold tracking-tight shadow-lg shadow-primary/20 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-30 disabled:grayscale"
@@ -1206,7 +1206,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                       and the tab that produces the 10 was three lines away.
                       Spelling out "10 objetivos alineados" makes the button say
                       the same thing as the sentence beside it and as the
-                      "Alineados" tab, so the three cannot drift apart.
+                      "Objetivos listos para cargar" tab, so the three cannot drift apart.
                     */}
                     <span>
                       {readyObjectives > 0
