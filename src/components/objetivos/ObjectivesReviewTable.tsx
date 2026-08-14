@@ -290,6 +290,11 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
   const [query, setQuery] = React.useState("");
   const [measureFilters, setMeasureFilters] = React.useState<MeasureType[]>([]);
   const [trendFilters, setTrendFilters] = React.useState<Trend[]>([]);
+  const [areaFilters, setAreaFilters] = React.useState<string[]>([]);
+  const [leaderFilters, setLeaderFilters] = React.useState<string[]>([]);
+
+  const allAreas = React.useMemo(() => Array.from(new Set(groups.map(g => g.matchedUser?.area).filter(Boolean))) as string[], [groups]);
+  const allLeaders = React.useMemo(() => Array.from(new Set(groups.map(g => g.matchedUser?.leader).filter(Boolean))) as string[], [groups]);
 
   const groupsByBucket = React.useMemo(
     () =>
@@ -451,7 +456,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
   );
 
   const hasFilters =
-    query.trim() !== "" || measureFilters.length > 0 || trendFilters.length > 0;
+    query.trim() !== "" || measureFilters.length > 0 || trendFilters.length > 0 || areaFilters.length > 0 || leaderFilters.length > 0;
 
   /**
    * The user search matches the whole group, the field filters narrow the rows
@@ -466,8 +471,12 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
         needle === "" ||
         groupDisplayName(group).toLowerCase().includes(needle) ||
         group.identifier.toLowerCase().includes(needle);
+      
+      const showUserFilters = tab === 'errores' || tab === 'alineados';
+      const matchesArea = !showUserFilters || areaFilters.length === 0 || areaFilters.includes(group.matchedUser?.area || "");
+      const matchesLeader = !showUserFilters || leaderFilters.length === 0 || leaderFilters.includes(group.matchedUser?.leader || "");
 
-      if (!matchesUser) return visible;
+      if (!matchesUser || !matchesArea || !matchesLeader) return visible;
 
       const objectives = group.objectives.filter(
         (objective) =>
@@ -477,32 +486,36 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
 
       return objectives.length === 0 ? visible : [...visible, { group, objectives }];
     }, []);
-  }, [groupsByBucket, tab, query, measureFilters, trendFilters]);
+  }, [groupsByBucket, tab, query, measureFilters, trendFilters, areaFilters, leaderFilters]);
 
   /**
    * Filtering is a search intent, so every match opens — a collapsed accordion
    * as the answer to a search would hide the very rows the user asked for.
    * Clearing the filters restores the only-the-first-user default.
    */
-  const updateFilters = (next: {
+  const updateFilters = (patch: {
     query?: string;
     measures?: MeasureType[];
     trends?: Trend[];
+    areas?: string[];
+    leaders?: string[];
   }) => {
-    const nextQuery = next.query ?? query;
-    const nextMeasures = next.measures ?? measureFilters;
-    const nextTrends = next.trends ?? trendFilters;
+    const nextQuery = patch.query ?? query;
+    const nextMeasures = patch.measures ?? measureFilters;
+    const nextTrends = patch.trends ?? trendFilters;
+    const nextAreas = patch.areas ?? areaFilters;
+    const nextLeaders = patch.leaders ?? leaderFilters;
 
     setQuery(nextQuery);
     setMeasureFilters(nextMeasures);
     setTrendFilters(nextTrends);
+    setAreaFilters(nextAreas);
+    setLeaderFilters(nextLeaders);
 
-    const isNarrowing =
-      nextQuery.trim() !== "" || nextMeasures.length > 0 || nextTrends.length > 0;
-    setCollapsed(isNarrowing ? new Set<string>() : collapseAllButFirst(groupsByBucket[tab]));
+    setCollapsed(collapseAllButFirst(groupsByBucket[tab]));
   };
 
-  const clearFilters = () => updateFilters({ query: "", measures: [], trends: [] });
+  const clearFilters = () => updateFilters({ query: "", measures: [], trends: [], areas: [], leaders: [] });
 
   /** Adds or removes one option, never mutating the array in place. */
   function toggleFilter<T extends string>(current: T[], option: T): T[] {
@@ -512,10 +525,17 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
   }
 
   const toggleGroup = (identifier: string) => {
-    const next = new Set(collapsed);
-    if (next.has(identifier)) next.delete(identifier);
-    else next.add(identifier);
-    setCollapsed(next);
+    const isCurrentlyCollapsed = collapsed.has(identifier);
+    if (isCurrentlyCollapsed) {
+      // Opening it: collapse all others
+      const next = new Set(groupsByBucket[tab].map((g) => g.identifier));
+      next.delete(identifier);
+      setCollapsed(next);
+    } else {
+      // Closing it: collapse all
+      const next = new Set(groupsByBucket[tab].map((g) => g.identifier));
+      setCollapsed(next);
+    }
   };
 
   /** What the header counts: the tab's own totals, after search and filters. */
@@ -525,15 +545,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
     0
   );
 
-  const allCollapsed =
-    visibleGroups.length > 0 &&
-    visibleGroups.every((entry) => collapsed.has(entry.group.identifier));
 
-  const toggleAllGroups = () => {
-    setCollapsed(
-      allCollapsed ? new Set() : new Set(visibleGroups.map((entry) => entry.group.identifier))
-    );
-  };
 
   return (
     /*
@@ -686,6 +698,24 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                 onToggle: (option) =>
                   updateFilters({ trends: toggleFilter(trendFilters, option as Trend) }),
               },
+              ...(tab === 'errores' || tab === 'alineados' ? [
+                {
+                  id: "area",
+                  label: "Área",
+                  options: allAreas,
+                  selected: areaFilters,
+                  onToggle: (option: string) =>
+                    updateFilters({ areas: toggleFilter(areaFilters, option) }),
+                },
+                {
+                  id: "lider",
+                  label: "Líder",
+                  options: allLeaders,
+                  selected: leaderFilters,
+                  onToggle: (option: string) =>
+                    updateFilters({ leaders: toggleFilter(leaderFilters, option) }),
+                }
+              ] : [])
             ]}
           />
 
@@ -711,26 +741,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
             </Tooltip>
           )}
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={allCollapsed ? "Expandir todos" : "Contraer todos"}
-                onClick={toggleAllGroups}
-                disabled={visibleGroups.length === 0}
-                className="h-10 w-10 rounded-full text-text-secondary hover:bg-muted/50 transition-all hover:scale-110 disabled:opacity-40 disabled:hover:scale-100"
-              >
-                <ChevronsDownUp
-                  className={cn("h-5 w-5 transition-transform", allCollapsed && "rotate-180")}
-                />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <span>{allCollapsed ? "Expandir todos" : "Contraer todos"}</span>
-            </TooltipContent>
-          </Tooltip>
+
         </div>
       </div>
 
@@ -928,7 +939,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                   key={group.identifier}
                   inert={isCardIdle || undefined}
                   className={cn(
-                    "rounded-xl border border-border/60 bg-surface overflow-hidden transition-opacity",
+                    "rounded-xl border border-border/60 bg-surface transition-opacity",
                     isCardIdle && "opacity-50"
                   )}
                 >
@@ -937,7 +948,11 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                       the ground under the answer. */}
                   <div
                     inert={isConfirmingRowHere || undefined}
-                    className={cn("transition-opacity", isConfirmingRowHere && "opacity-50")}
+                    className={cn(
+                      "transition-opacity sticky top-0 z-20 bg-surface shadow-sm rounded-t-xl",
+                      isCollapsed && "rounded-b-xl",
+                      isConfirmingRowHere && "opacity-50"
+                    )}
                   >
                     <ObjectiveGroupHeader
                       group={group}
@@ -1097,7 +1112,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                             colgroup is what keeps the columns aligned between
                             cards. */}
                         <thead>
-                          <tr className="text-[10px] font-bold uppercase tracking-wider text-text-secondary/40 border-b border-border/40">
+                          <tr className="text-[10px] font-bold uppercase tracking-wider text-text-secondary/40 border-b border-border/40 sticky top-14 z-10 bg-surface shadow-sm">
                             <th scope="col" className="pl-3 pr-1 py-1.5 text-right" title="Fila en el archivo">
                               #
                             </th>

@@ -99,7 +99,7 @@ interface ObjectiveRowChip {
    * table; painting the chip too would be the same fact in two places and a
    * third chip colour the other two operations never show.
    */
-  tone?: "warning";
+  tone?: "warning" | "neutral";
 }
 
 /**
@@ -224,12 +224,11 @@ function QuietSelect<T extends string>({
         aria-label={ariaLabel}
         // The full name, for whatever the column is too narrow to finish showing.
         title={renderOption(value)}
-        // Same quiet-at-rest treatment as the text cells beside it: the border
-        // and surface only appear on hover and focus.
+        // Always show a border for the select inputs, as requested by the user.
         className={cn(
-          "h-7 w-full gap-1 px-1.5 rounded-md border border-transparent bg-transparent dark:bg-transparent",
+          "h-7 w-full gap-1 px-1.5 rounded-md border border-border/60 bg-transparent dark:bg-transparent",
           "text-[12px] text-text-primary transition-colors cursor-pointer",
-          "hover:border-border/50 hover:bg-surface",
+          "hover:border-border/80 hover:bg-surface-muted/60",
           "focus:bg-surface focus:border-primary focus:ring-2 focus:ring-primary/20",
           "[&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-text-secondary/40",
           /*
@@ -517,9 +516,10 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
                 icon: <PencilLine className="h-2.5 w-2.5" strokeWidth={2.5} />,
               }
             : {
-                label: "Ya en UBITS",
+                label: "Ya creado en UBITS",
                 hint: "Este objetivo ya existe en UBITS. No se va a crear de nuevo; solo se actualizará si lo ajustas.",
                 icon: <CircleCheck className="h-2.5 w-2.5" strokeWidth={2.5} />,
+                tone: "neutral",
               };
 
   /*
@@ -680,7 +680,9 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
                   "shrink-0 inline-flex items-center gap-1 pl-1.5 pr-2 py-0.5 rounded-full border text-[9.5px] font-bold whitespace-nowrap",
                   chip.tone === "warning"
                     ? "border-status-warning/60 bg-status-warning/10 text-status-warning"
-                    : "border-border/60 bg-surface text-text-secondary/65"
+                    : chip.tone === "neutral"
+                      ? "border-black/10 bg-black/[0.06] text-text-primary/90"
+                      : "border-border/60 bg-surface text-text-secondary/65"
                 )}
                 title={chip.hint}
               >

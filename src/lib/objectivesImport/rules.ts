@@ -256,7 +256,7 @@ export function validateProgressUpdate(objective: ParsedObjective): RuleViolatio
       violations.push({
         rule: 'R4',
         field: 'newProgress',
-        message: `No alcanza el mínimo (${minProgress}), así que el cumplimiento quedará en 0%.`,
+        message: `Valor mínimo aceptable de avance es ${minProgress}, en caso de no alcanzarlo el cumplimiento será 0.`,
         severity: 'warning',
       });
     }
@@ -271,7 +271,7 @@ export function validateProgressUpdate(objective: ParsedObjective): RuleViolatio
         // El tope frena el VALOR, no el porcentaje: si el máximo está más allá
         // de la meta, cumplir hasta el tope da más de 100% y eso es correcto.
         // Decir "se topa en 100%" sería mentir sobre lo que va a quedar guardado.
-        message: `Supera el máximo (${maxProgress}): el cumplimiento se calcula hasta el tope, no más allá.`,
+        message: `Valor máximo aceptable de avance es ${maxProgress}, en caso de superarlo el cumplimiento se ajusta al tope.`,
         severity: 'warning',
       });
     }

@@ -148,7 +148,7 @@ export const FilterButton: React.FC<{
   const activeCount = groups.reduce((total, group) => total + group.selected.length, 0);
 
   return (
-    <Popover>
+    <Popover modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"

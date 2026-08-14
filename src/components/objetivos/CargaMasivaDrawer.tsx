@@ -1,21 +1,26 @@
 import * as React from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   Calendar,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   ExternalLink,
   FileSearch,
   FileText,
+  Filter,
   RefreshCw,
   Info,
   Minimize2,
   Pencil,
   Plus,
+  Search,
   Sparkles,
   TrendingUp,
   Upload,
+  User,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,10 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { DrawerShell } from "@/components/overlays/DrawerShell";
 import { EmptyState } from "@/components/feedback/EmptyState";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { ObjectivesReviewTable } from "@/components/objetivos/ObjectivesReviewTable";
+import { FilterButton } from "@/components/objetivos/ListToolbar";
 import {
   BULK_UPLOAD_MODES,
   OBJECTIVES_IMPORT_ACCEPT,
@@ -49,6 +56,9 @@ import {
   type ParsedObjective,
   type RosterUser,
 } from "@/lib/objectivesImport";
+import { MEASURE_SYMBOL, type MeasureType } from "@/lib/objectivesImport/types";
+import { validateObjective, groupWeightTotal, TOTAL_WEIGHT_PERCENT } from "@/lib/objectivesImport/rules";
+import { buildUserIndex, matchIdentifier } from "@/lib/objectivesImport/matchUsers";
 
 /**
  * CargaMasivaDrawer
@@ -70,7 +80,7 @@ import {
  * still exists, but it lives in the "Cargas" tab and in the corner tray, so the
  * wizard has nothing to show for it.
  */
-type UploadStep = 'dropzone' | 'summary' | 'error' | 'empty';
+type UploadStep = 'dropzone' | 'summary' | 'error' | 'empty' | 'detail';
 
 /** El aviso de "este archivo es de otra operación", tal como llega del análisis. */
 type TemplateMismatch = Extract<AnalyzeObjectivesOutcome, { kind: 'mismatch' }>;
@@ -88,7 +98,20 @@ interface UploadRowResult {
   id: string;
   title: string;
   userName: string;
-  status: 'pending' | 'uploaded' | 'failed';
+  userEmail?: string;
+  userArea?: string;
+  userLeader?: string;
+  description?: string;
+  weightPercent?: number;
+  measureType?: string;
+  trend?: string;
+  initialValue?: number | null;
+  target?: number;
+  minProgress?: number | null;
+  maxProgress?: number | null;
+  newProgress?: number | null;
+  status: 'pending' | 'uploaded' | 'failed' | 'unassigned' | 'analysis_error';
+  analysisError?: string;
   willFail: boolean;
 }
 
@@ -125,9 +148,10 @@ function failureFor(index: number): boolean {
 
 /** Rows already answered for, over the total. Drives every bar for this task. */
 function taskProgress(task: UploadTaskState): number {
-  if (task.rows.length === 0) return 100;
-  const done = task.rows.filter((row) => row.status !== 'pending').length;
-  return Math.round((done / task.rows.length) * 100);
+  const uploadableRows = task.rows.filter((row) => row.status !== 'unassigned' && row.status !== 'analysis_error');
+  if (uploadableRows.length === 0) return 100;
+  const done = uploadableRows.filter((row) => row.status !== 'pending').length;
+  return Math.round((done / uploadableRows.length) * 100);
 }
 
 function countByStatus(task: UploadTaskState, status: UploadRowResult['status']): number {
@@ -376,6 +400,12 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 }) => {
   const [tab, setTab] = React.useState<'nueva' | 'cargas'>('nueva');
   const [step, setStep] = React.useState<UploadStep>('dropzone');
+  const [detailTask, setDetailTask] = React.useState<UploadTaskState | null>(null);
+  const [detailSearch, setDetailSearch] = React.useState('');
+  const [detailActiveTab, setDetailActiveTab] = React.useState<'exitosos' | 'pendientes'>('exitosos');
+  const [detailStatusFilter, setDetailStatusFilter] = React.useState<string[]>([]);
+  const [detailAreaFilter, setDetailAreaFilter] = React.useState<string[]>([]);
+  const [detailLeaderFilter, setDetailLeaderFilter] = React.useState<string[]>([]);
   const [mode, setMode] = React.useState<BulkUploadMode>('crear');
   const [files, setFiles] = React.useState<File[]>([]);
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
@@ -416,6 +446,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 
   /** True while the footer is asking whether to discard the whole review. */
   const [isConfirmingCancel, setConfirmingCancel] = React.useState(false);
+  const [isConfirmingPartialLoad, setConfirmingPartialLoad] = React.useState(false);
   /** Same question, asked from the minimised card instead of the footer. */
   const [isConfirmingTrayCancel, setConfirmingTrayCancel] = React.useState(false);
 
@@ -966,31 +997,96 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     // reviewer lowered to free up room has to be written before the rows that
     // need that room, or the platform would reject them for busting 100% halfway
     // through — so the order here is the order the writes have to happen in.
-    const rows: UploadRowResult[] = groups
-      .filter((group) => bucketForGroup(group) === 'alineados')
-      .flatMap((group) => {
-        const userName = group.matchedUser?.name ?? group.identifier;
-        return [
-          // An objective the reviewer adjusted by hand without any row of the
-          // file pointing at it. `willUpdateObjective` rows already carry their
-          // own edit, so counting the objective they replace would send it twice.
-          ...group.existing
-            .filter((objective) => hasSavedEdits(objective))
-            .filter(
-              (objective) =>
-                !group.objectives.some((row) => row.link?.targetId === objective.id)
-            )
-            .map((objective) => ({ objective, userName })),
-          ...group.objectives.map((objective) => ({ objective, userName })),
-        ];
-      })
-      .map(({ objective, userName }, index) => ({
-        id: objective.id,
-        title: objective.title,
-        userName,
-        status: 'pending' as const,
-        willFail: !cameInClean && failureFor(index),
-      }));
+    const rows: UploadRowResult[] = [
+      ...groups
+        .filter((group) => bucketForGroup(group) === 'alineados')
+        .flatMap((group) => {
+          const userName = group.matchedUser?.name ?? group.identifier;
+          const userEmail = group.matchedUser?.email;
+          const userArea = group.matchedUser?.area;
+          const userLeader = group.matchedUser?.leader;
+          return [
+            // An objective the reviewer adjusted by hand without any row of the
+            // file pointing at it. `willUpdateObjective` rows already carry their
+            // own edit, so counting the objective they replace would send it twice.
+            ...group.existing
+              .filter((objective) => hasSavedEdits(objective))
+              .filter(
+                (objective) =>
+                  !group.objectives.some((row) => row.link?.targetId === objective.id)
+              )
+              .map((objective) => ({ objective, userName, userEmail, userArea, userLeader })),
+            ...group.objectives.map((objective) => ({ objective, userName, userEmail, userArea, userLeader })),
+          ];
+        })
+        .map(({ objective, userName, userEmail, userArea, userLeader }, index) => ({
+          id: objective.id,
+          title: objective.title,
+          userName,
+          userEmail,
+          userArea,
+          userLeader,
+          description: objective.description,
+          weightPercent: objective.weightPercent,
+          measureType: objective.measureType,
+          trend: objective.trend,
+          initialValue: objective.initialValue,
+          target: objective.target,
+          minProgress: objective.minProgress,
+          maxProgress: objective.maxProgress,
+          newProgress: objective.newProgress,
+          status: 'pending' as const,
+          willFail: false,
+        })),
+      ...groups
+        .filter((group) => bucketForGroup(group) !== 'alineados')
+        .flatMap((group) => {
+          const userName = group.matchedUser?.name ?? group.identifier;
+          const userEmail = group.matchedUser?.email;
+          const userArea = group.matchedUser?.area;
+          const userLeader = group.matchedUser?.leader;
+          const bucket = bucketForGroup(group);
+          return [
+            ...group.objectives.map((objective) => ({ objective, userName, userEmail, userArea, userLeader, bucket, group })),
+          ];
+        })
+        .map(({ objective, userName, userEmail, userArea, userLeader, bucket, group }) => {
+          let analysisError: string | undefined;
+          if (bucket === 'errores') {
+            const ruleViolations = validateObjective(objective);
+            if (ruleViolations.length > 0) {
+              analysisError = ruleViolations[0].message;
+            } else if (groupWeightTotal(group) > TOTAL_WEIGHT_PERCENT) {
+              analysisError = `El peso total supera el ${TOTAL_WEIGHT_PERCENT}%.`;
+            } else if (!group.reviewConfirmed) {
+              analysisError = "Pendiente de confirmación por el usuario.";
+            } else {
+              analysisError = "Error en el objetivo.";
+            }
+          }
+
+          return {
+            id: objective.id,
+            title: objective.title,
+            userName,
+            userEmail,
+            userArea,
+            userLeader,
+            description: objective.description,
+            weightPercent: objective.weightPercent,
+            measureType: objective.measureType,
+            trend: objective.trend,
+            initialValue: objective.initialValue,
+            target: objective.target,
+            minProgress: objective.minProgress,
+            maxProgress: objective.maxProgress,
+            newProgress: objective.newProgress,
+            status: bucket === 'errores' ? 'analysis_error' as const : 'unassigned' as const,
+            analysisError,
+            willFail: false,
+          };
+        }),
+    ];
 
     /*
       El caso "se cayó el servicio", disparado por el nombre del archivo.
@@ -1018,6 +1114,62 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
     setTab('cargas');
 
     runUploadProgress(taskId, failsAtRow);
+  };
+
+  const handleResumeTask = (task: UploadTaskState) => {
+    const pendingRows = task.rows.filter(r => r.status === 'failed' || r.status === 'analysis_error' || r.status === 'unassigned');
+    const newGroupsMap = new Map<string, ObjectiveUserGroup>();
+    const userIndex = buildUserIndex([
+      ...roster.map((user) => ({ ...user, onCycle: true })),
+      ...(directory || []).map((user) => ({ ...user, onCycle: user.onCycle ?? false })),
+    ]);
+    
+    for (const row of pendingRows) {
+      const identifier = row.userEmail || row.userName;
+      if (!newGroupsMap.has(identifier)) {
+        const match = matchIdentifier(identifier, userIndex);
+        
+        let matchStatus = match.status;
+        let matchedUser = match.user;
+        
+        if (row.status !== 'unassigned') {
+          matchStatus = 'matched';
+          const allUsers = [...roster, ...(directory || [])];
+          matchedUser = allUsers.find(u => u.email === row.userEmail || u.name === row.userName) || undefined;
+        }
+
+        newGroupsMap.set(identifier, {
+          identifier,
+          identifierType: match.identifierType,
+          mode: mode,
+          matchStatus,
+          matchedUser,
+          suggestion: match.suggestion,
+          suggestionBasis: match.basis,
+          suggestionReason: match.reason,
+          isManual: false,
+          objectives: [],
+          existing: [],
+          reviewConfirmed: false,
+        });
+      }
+      newGroupsMap.get(identifier)!.objectives.push({
+        id: row.id,
+        title: row.title,
+        description: row.description || '',
+        weightPercent: row.weightPercent || 0,
+        measureType: (row.measureType || 'Numérico') as MeasureType,
+        trend: (row.trend || 'Aumentar') as Trend,
+        initialValue: row.initialValue ?? null,
+        target: row.target ?? NaN,
+        minProgress: row.minProgress ?? null,
+        maxProgress: row.maxProgress ?? null,
+        newProgress: row.newProgress ?? null,
+      } as any);
+    }
+    setGroups(Array.from(newGroupsMap.values()));
+    setTab('nueva');
+    setStep('summary');
   };
 
   const title =
@@ -1160,7 +1312,38 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                 </Button>
               )}
 
-              {step === 'summary' && !isConfirmingCancel && (
+              {step === 'summary' && isConfirmingPartialLoad && (
+                <div className="flex-1 flex items-center gap-3">
+                  <p className="flex-1 text-[12px] font-medium text-text-secondary leading-snug">
+                    <span className="font-bold text-status-warning">
+                      ¿Cargar con {remainingUsers} {remainingUsers === 1 ? "pendiente" : "pendientes"}?
+                    </span>{" "}
+                    Solo se {readyObjectives === 1 ? "cargará" : "cargarán"} {readyObjectives} {readyObjectives === 1 ? "objetivo alineado" : "objetivos alineados"}. Puedes retomar los demás más adelante.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 px-5 text-xs font-bold tracking-tight rounded-xl"
+                    onClick={() => setConfirmingPartialLoad(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    autoFocus
+                    onClick={() => {
+                      setConfirmingPartialLoad(false);
+                      handleConfirm();
+                    }}
+                    className="gap-2.5 h-11 px-5 text-xs font-bold tracking-tight rounded-xl bg-primary text-text-inverse hover:bg-primary/90 shadow-lg shadow-primary/20"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Confirmar carga
+                  </Button>
+                </div>
+              )}
+
+              {step === 'summary' && !isConfirmingCancel && !isConfirmingPartialLoad && (
                 <>
                   {/*
                     No running commentary next to the buttons.
@@ -1189,7 +1372,13 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
 
                   <Button
                     disabled={readyObjectives === 0}
-                    onClick={handleConfirm}
+                    onClick={() => {
+                      if (remainingUsers > 0) {
+                        setConfirmingPartialLoad(true);
+                      } else {
+                        handleConfirm();
+                      }
+                    }}
                     title={
                       readyObjectives === 0
                         ? 'Resuelve al menos un usuario en la pestaña "Objetivos listos para cargar" para poder cargar'
@@ -1225,15 +1414,32 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                 <Button
                   onClick={() => {
                     setError(null);
-                    setFiles([]);
                     setStep('dropzone');
+                    setFiles([]);
                   }}
-                  className="flex-1 gap-2.5 h-11 text-xs font-bold tracking-tight shadow-lg shadow-primary/20 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.98]"
+                  className="flex-1 h-11 text-xs font-bold tracking-tight rounded-xl bg-primary text-text-inverse hover:bg-primary/90"
                 >
-                  <Upload className="h-4 w-4" />
-                  <span>Subir otro archivo</span>
+                  Entendido
                 </Button>
               )}
+
+              {step === 'detail' && detailTask && (() => {
+                const pendingRows = detailTask.rows.filter(r => r.status === 'failed' || r.status === 'analysis_error' || r.status === 'unassigned');
+                if (pendingRows.length === 0) return null;
+                return (
+                  <>
+                    <div className="flex-1" />
+                    <Button
+                      type="button"
+                      onClick={() => handleResumeTask(detailTask)}
+                      className="gap-2.5 h-11 px-5 text-xs font-bold tracking-tight shadow-lg shadow-primary/20 rounded-xl bg-primary text-text-inverse hover:bg-primary/90 transition-all hover:scale-[1.01] active:scale-[0.98]"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Retomar carga ({pendingRows.length})
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -1368,6 +1574,12 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
                         task={task}
                         cycleName={cycleName}
                         onRetry={() => retryUpload(task.id)}
+                        onViewDetails={() => {
+                          setDetailTask(task);
+                          setStep('detail');
+                        }}
+                        onResumePending={() => handleResumeTask(task)}
+                        hasPending={task.rows.some(r => r.status === 'failed' || r.status === 'analysis_error' || r.status === 'unassigned')}
                       />
                     ))}
                 </div>
@@ -1424,7 +1636,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
         </Tabs>
       )}
 
-      {step === 'summary' && analysis && (
+      {step === 'summary' && (
         /* Fills the drawer body instead of growing past it, so the review owns
            the scroll. Goes inert behind the discard question, the same way the
            review's cards go inert behind a removal question.
@@ -1435,10 +1647,10 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
            a second scoreboard for the same match, taking the top of the panel
            where the review should start. */
         <div
-          inert={isConfirmingCancel || undefined}
+          inert={isConfirmingCancel || isConfirmingPartialLoad || undefined}
           className={cn(
             "flex-1 min-h-0 flex flex-col gap-4 transition-opacity",
-            isConfirmingCancel && "opacity-50"
+            (isConfirmingCancel || isConfirmingPartialLoad) && "opacity-50"
           )}
         >
           {/*
@@ -1452,7 +1664,7 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
             operations that had not been wired to the parser yet. All three read
             the file for real now, so it went with them.
           */}
-          {analysis.notes.length > 0 && (
+          {analysis?.notes && analysis.notes.length > 0 && (
             <Alert variant="info" className="shrink-0">
               <Info className="h-4 w-4" />
               <AlertDescription className="text-xs">
@@ -1480,6 +1692,256 @@ export const CargaMasivaDrawer: React.FC<CargaMasivaDrawerProps> = ({
           />
         </div>
       )}
+
+      {step === 'detail' && detailTask && (() => {
+        const areas = Array.from(new Set(detailTask.rows.map(r => r.userArea).filter(Boolean))) as string[];
+        const leaders = Array.from(new Set(detailTask.rows.map(r => r.userLeader).filter(Boolean))) as string[];
+
+        const filteredRows = detailTask.rows.filter(row => {
+          // Tab specific filtering
+          if (detailActiveTab === 'exitosos' && row.status !== 'uploaded') return false;
+          if (detailActiveTab === 'pendientes' && row.status === 'uploaded') return false;
+
+          const matchesSearch = row.title.toLowerCase().includes(detailSearch.toLowerCase()) || row.userName.toLowerCase().includes(detailSearch.toLowerCase());
+          const mappedStatus = row.status === 'analysis_error' ? 'failed' : row.status;
+          const matchesStatus = detailStatusFilter.length === 0 || detailStatusFilter.includes(mappedStatus);
+          const matchesArea = detailAreaFilter.length === 0 || detailAreaFilter.includes(row.userArea || "");
+          const matchesLeader = detailLeaderFilter.length === 0 || detailLeaderFilter.includes(row.userLeader || "");
+          return matchesSearch && matchesStatus && matchesArea && matchesLeader;
+        });
+
+        const groupedByUser = filteredRows.reduce((acc, row) => {
+          if (!acc[row.userName]) acc[row.userName] = [];
+          acc[row.userName].push(row);
+          return acc;
+        }, {} as Record<string, UploadRowResult[]>);
+
+        const renderAccordion = (rowsGrouped: Record<string, UploadRowResult[]>) => {
+          const userEntries = Object.entries(rowsGrouped);
+          if (userEntries.length === 0) {
+            return (
+              <div className="p-8 text-center text-text-secondary/60 text-sm">
+                No se encontraron resultados.
+              </div>
+            );
+          }
+          return (
+            <Accordion type="single" collapsible className="w-full flex flex-col gap-3 px-4 pb-4 pt-2">
+              {userEntries.map(([user, rows]) => {
+                const isAllFailed = rows.every(r => r.status === 'failed' || r.status === 'analysis_error');
+                return (
+                  <AccordionItem key={user} value={user} className="group/item border border-border/60 bg-surface rounded-xl">
+                    <div className="sticky top-0 z-10 bg-surface rounded-t-xl group-data-[state=closed]/item:rounded-b-xl px-4 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                      <AccordionTrigger className="hover:no-underline py-4">
+                        <div className="flex items-center justify-between w-full pr-4 text-left">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-text-primary">{user}</h4>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-text-secondary mt-1 font-medium">
+                            {rows[0]?.userArea && <span>{rows[0].userArea}</span>}
+                            {rows[0]?.userArea && rows[0]?.userLeader && <span className="text-border/60">•</span>}
+                            {rows[0]?.userLeader && <span>Líder: {rows[0].userLeader}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs font-medium mr-4 shrink-0">
+                          {(rows.some(r => r.status === 'failed') || rows.some(r => r.status === 'analysis_error')) && (
+                            <Badge variant="outline" className="text-[10px] font-bold border-none px-2 py-0.5 rounded-full bg-status-negative/10 text-status-negative pointer-events-none whitespace-nowrap flex items-center">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              {rows.filter(r => r.status === 'failed' || r.status === 'analysis_error').length} Error
+                            </Badge>
+                          )}
+                          {rows.some(r => r.status === 'uploaded') && (
+                            <Badge variant="outline" className="text-[10px] font-bold border-none px-2 py-0.5 rounded-full bg-status-positive-bg text-status-positive pointer-events-none whitespace-nowrap flex items-center">
+                              <Check className="w-3 h-3 mr-1" strokeWidth={3} />
+                              {rows.filter(r => r.status === 'uploaded').length} Exitoso
+                            </Badge>
+                          )}
+                          {rows.some(r => r.status === 'unassigned') && (
+                            <Badge variant="outline" className="text-[10px] font-bold border-none px-2 py-0.5 rounded-full bg-surface-muted text-text-secondary/70 pointer-events-none whitespace-nowrap flex items-center">
+                              <Info className="w-3 h-3 mr-1" />
+                              {rows.filter(r => r.status === 'unassigned').length} Sin asignar
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    </div>
+                    <AccordionContent className="pt-0 pb-4 px-4 border-t border-border/40 space-y-4">
+                      <div className="pt-4 space-y-4">
+                        {rows.map((row) => (
+                          <div key={row.id} className="flex gap-3">
+                            {row.status === 'uploaded' ? (
+                              <div className="h-6 w-6 rounded-full bg-status-positive/10 text-status-positive flex items-center justify-center shrink-0 mt-0.5">
+                                <Check className="h-3 w-3" strokeWidth={3} />
+                              </div>
+                            ) : row.status === 'failed' || row.status === 'analysis_error' ? (
+                              <div className="h-6 w-6 rounded-full bg-status-negative/10 text-status-negative flex items-center justify-center shrink-0 mt-0.5">
+                                <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
+                              </div>
+                            ) : (
+                              <div className="h-6 w-6 rounded-full bg-surface-hover border border-border/40 text-text-secondary flex items-center justify-center shrink-0 mt-0.5">
+                                <Info className="h-3 w-3" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-4">
+                                <span className="font-bold text-[13px] leading-snug text-text-primary">{row.title}</span>
+                                <span className="text-[11px] font-bold text-text-primary bg-muted px-2 py-0.5 rounded shrink-0">{row.weightPercent}%</span>
+                              </div>
+                              <p className="text-[11px] text-text-secondary/80 mt-1 line-clamp-2 leading-relaxed">
+                                {row.measureType === 'Se cumple / No se cumple' 
+                                  ? "Completar la meta"
+                                  : row.measureType && row.trend && row.target !== undefined
+                                  ? `${row.trend} de ${row.initialValue ?? 0} a ${row.target} (${MEASURE_SYMBOL[row.measureType as MeasureType] ?? ''} ${row.measureType})`
+                                  : row.description}
+                              </p>
+                              {row.status === 'failed' && (
+                                <span className="text-status-negative/80 text-[11px] font-medium mt-1.5 flex items-center">
+                                  Error al guardar en el servidor.
+                                </span>
+                              )}
+                              {row.status === 'analysis_error' && (
+                                <span className="text-status-negative/80 text-[11px] font-medium mt-1.5 flex items-center">
+                                  {row.analysisError || "Error de validación."}
+                                </span>
+                              )}
+                              {row.status === 'unassigned' && (
+                                <span className="text-text-secondary/80 text-[11px] font-medium mt-1.5 flex items-center">
+                                  Pendiente de asignación.
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          );
+        };
+
+        return (
+          <div className="flex-1 min-h-0 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            {/* Header row */}
+            <div className="flex items-center justify-between mt-2 px-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDetailTask(null);
+                  setStep('dropzone');
+                }}
+                className="h-8 px-3 rounded-full bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary font-bold"
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" strokeWidth={3} />
+                Volver
+              </Button>
+              {remainingUsers > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setTab('revision');
+                    setStep('summary');
+                  }}
+                  className="h-8 rounded-full px-4 text-xs font-bold text-primary border-primary/20 hover:bg-primary/5"
+                >
+                  Retomar pendientes
+                </Button>
+              )}
+            </div>
+
+            <div className="text-center mt-1 mb-2">
+              <h2 className="text-lg font-bold tracking-tight text-text-primary">Detalle de la carga</h2>
+            </div>
+
+            <Tabs value={detailActiveTab} onValueChange={(val) => { setDetailActiveTab(val as 'exitosos' | 'pendientes'); setDetailStatusFilter([]); }} className="flex-1 flex flex-col min-h-0 mt-1">
+              <div className="px-4 pb-4">
+                <TabsList className="grid grid-cols-2 w-full h-11 p-1 gap-1 bg-surface-muted rounded-xl shrink-0">
+                  <TabsTrigger 
+                    value="exitosos" 
+                    className="gap-2 h-full text-[13px] font-bold tracking-tight rounded-lg text-text-secondary/70 transition-all data-[state=active]:bg-surface data-[state=active]:text-primary data-[state=active]:shadow-sm"
+                  >
+                    Cargados exitosamente
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="pendientes" 
+                    className="gap-2 h-full text-[13px] font-bold tracking-tight rounded-lg text-text-secondary/70 transition-all data-[state=active]:bg-surface data-[state=active]:text-primary data-[state=active]:shadow-sm"
+                  >
+                    Pendientes por cargar
+                  </TabsTrigger>
+                </TabsList>
+
+                <div className="flex items-center gap-2 mt-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary/60" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar por usuario u objetivo..." 
+                      value={detailSearch} 
+                      onChange={(e) => setDetailSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-surface text-sm text-text-primary rounded-md border border-border/40 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-text-secondary/40 font-medium"
+                    />
+                  </div>
+                  <FilterButton
+                    onClearAll={() => {
+                      setDetailStatusFilter([]);
+                      setDetailAreaFilter([]);
+                      setDetailLeaderFilter([]);
+                    }}
+                    groups={[
+                      ...(detailActiveTab === 'pendientes' ? [{
+                        id: "estado",
+                        label: "Estado",
+                        options: ["Con error", "Sin asignar"],
+                        selected: detailStatusFilter,
+                        onToggle: (option: string) => {
+                          const mapped = option === "Con error" ? "failed" : "unassigned";
+                          setDetailStatusFilter(prev => 
+                            prev.includes(mapped) ? prev.filter(x => x !== mapped) : [...prev, mapped]
+                          );
+                        }
+                      }] : []),
+                      {
+                        id: "area",
+                        label: "Área",
+                        options: areas,
+                        selected: detailAreaFilter,
+                        onToggle: (option: string) => 
+                          setDetailAreaFilter(prev => 
+                            prev.includes(option) ? prev.filter(x => x !== option) : [...prev, option]
+                          ),
+                      },
+                      {
+                        id: "lider",
+                        label: "Líder",
+                        options: leaders,
+                        selected: detailLeaderFilter,
+                        onToggle: (option: string) => 
+                          setDetailLeaderFilter(prev => 
+                            prev.includes(option) ? prev.filter(x => x !== option) : [...prev, option]
+                          ),
+                      }
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <TabsContent value="exitosos" className="flex-1 overflow-y-auto m-0 border-none outline-none">
+                {renderAccordion(groupedByUser)}
+              </TabsContent>
+              <TabsContent value="pendientes" className="flex-1 overflow-y-auto m-0 border-none outline-none">
+                {renderAccordion(groupedByUser)}
+              </TabsContent>
+            </Tabs>
+          </div>
+        );
+      })()}
 
       {step === 'error' && error && (
         <div className="flex-1 flex items-center justify-center">
@@ -1550,10 +2012,14 @@ const UploadTaskCard: React.FC<{
   task: UploadTaskState;
   cycleName: string;
   onRetry?: () => void;
-}> = ({ task, cycleName, onRetry }) => {
+  onViewDetails?: () => void;
+  onResumePending?: () => void;
+  hasPending?: boolean;
+}> = ({ task, cycleName, onRetry, onViewDetails, onResumePending, hasPending }) => {
   const progress = taskProgress(task);
   const uploaded = countByStatus(task, 'uploaded');
   const failed = countByStatus(task, 'failed');
+  const pendingCount = task.rows.filter(r => r.status === 'failed' || r.status === 'analysis_error' || r.status === 'unassigned').length;
 
   return (
     <div
@@ -1573,7 +2039,7 @@ const UploadTaskCard: React.FC<{
           <div className="h-9 w-9 rounded-lg bg-status-negative/10 text-status-negative flex items-center justify-center shrink-0">
             <AlertTriangle className="h-4 w-4" strokeWidth={2.5} />
           </div>
-        ) : failed > 0 ? (
+        ) : pendingCount > 0 ? (
           <div className="h-9 w-9 rounded-lg bg-status-warning/10 text-status-warning flex items-center justify-center shrink-0">
             <AlertTriangle className="h-4 w-4" strokeWidth={2.5} />
           </div>
@@ -1596,9 +2062,9 @@ const UploadTaskCard: React.FC<{
               : task.serviceFailed
                 ? `La carga se interrumpió: ${uploaded} ${
                     uploaded === 1 ? 'objetivo alcanzó' : 'objetivos alcanzaron'
-                  } a cargarse y ${failed === 1 ? 'quedó 1' : `quedaron ${failed}`} sin cargar.`
-                : failed > 0
-                  ? `${uploaded} ${uploaded === 1 ? 'cargado' : 'cargados'} · ${failed} con error`
+                  } a cargarse y ${pendingCount === 1 ? 'quedó 1' : `quedaron ${pendingCount}`} sin cargar.`
+                : pendingCount > 0
+                  ? `${uploaded} ${uploaded === 1 ? 'cargado' : 'cargados'} · ${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`
                   : `${uploaded} ${uploaded === 1 ? 'objetivo cargado' : 'objetivos cargados'} en "${cycleName}"`}
           </p>
         </div>
@@ -1607,6 +2073,30 @@ const UploadTaskCard: React.FC<{
           <span className="text-sm font-bold text-primary tabular-nums shrink-0">
             {progress}%
           </span>
+        )}
+
+        {task.status !== 'loading' && onViewDetails && (
+          <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onViewDetails}
+              className="h-7 px-2.5 text-[10px] font-bold rounded-lg border-border/40 hover:bg-surface-hover"
+            >
+              Ver detalle
+            </Button>
+            {hasPending && onResumePending && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={onResumePending}
+                className="h-7 px-2.5 text-[10px] font-bold rounded-lg bg-primary text-text-inverse hover:bg-primary/90 shadow-sm"
+              >
+                Retomar carga
+              </Button>
+            )}
+          </div>
         )}
       </div>
 

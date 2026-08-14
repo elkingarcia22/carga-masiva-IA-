@@ -137,6 +137,8 @@ export const UserIdentityPicker: React.FC<UserIdentityPickerProps> = ({
   const shownUser = proposed ?? value;
   /** Nothing to name yet — the field is still the question, so it is outlined. */
   const isEmpty = matchStatus === "unmatched" && shownUser === undefined;
+  /** Needs confirmation either because it's empty, or because it has a proposed/staged user. */
+  const isUnconfirmed = isEmpty || proposed !== undefined;
 
   return (
     <Popover
@@ -159,16 +161,11 @@ export const UserIdentityPicker: React.FC<UserIdentityPickerProps> = ({
           className={cn(
             "group/id flex items-center gap-1.5 min-w-0 max-w-full h-8 pl-2 pr-1.5 rounded-lg border text-left transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-            // An empty field is the one state that outlines itself, because
-            // there the field IS the pending decision. Brand blue, not red: a
-            // person the directory has not got yet is work to do, not a fault
-            // in the file — which is also why that case has a tab of its own
-            // instead of living among the data errors. Once it names somebody,
-            // confirmed or not, it goes back to looking like a field; the chip
-            // beside it is what says whether that name is settled.
-            isEmpty
+            // Unconfirmed identities get the primary outline to indicate they need action.
+            // Confirmed identities get a standard input border.
+            isUnconfirmed
               ? "border-primary/50 bg-primary/[0.04] hover:border-primary"
-              : "border-transparent hover:border-border/60 hover:bg-surface-muted/60"
+              : "border-border/60 hover:border-border/80 hover:bg-surface-muted/60"
           )}
         >
           {/* No icon in the field. The card already opens with a person badge
@@ -177,7 +174,7 @@ export const UserIdentityPicker: React.FC<UserIdentityPickerProps> = ({
           <span
             className={cn(
               "text-[12.5px] font-bold truncate",
-              isEmpty ? "text-primary" : "text-text-primary"
+              isUnconfirmed ? "text-primary" : "text-text-primary"
             )}
           >
             {shownUser?.name ?? (isEmpty ? "Selecciona un usuario" : identifier)}
