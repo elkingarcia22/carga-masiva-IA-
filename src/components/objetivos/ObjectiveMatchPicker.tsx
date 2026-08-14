@@ -158,7 +158,8 @@ export const ObjectiveMatchPicker: React.FC<ObjectiveMatchPickerProps> = ({
             "disabled:opacity-40 disabled:cursor-not-allowed",
             // The pending decision is already flagged by the row's "Por confirmar"
             // chip, so the name control itself stays as quiet as every other row.
-            "border-transparent hover:border-border/50 hover:bg-surface"
+            isPending ? "border-border/50 bg-surface" : "border-transparent",
+            "hover:border-border/50 hover:bg-surface"
           )}
         >
           <span className="flex-1 min-w-0 truncate text-[12px] font-semibold text-text-primary">

@@ -45,8 +45,8 @@ export interface RuleViolation {
   rule: string;
   field: ObjectiveField;
   message: string;
-  /** `error` blocks the row from being approved; `warning` only informs. */
-  severity: 'error' | 'warning';
+  /** `error` blocks the row from being approved; `warning` and `info` only inform. */
+  severity: 'error' | 'warning' | 'info';
 }
 
 /**
@@ -156,7 +156,7 @@ export function validateObjective(objective: ParsedObjective): RuleViolation[] {
         rule: 'R4',
         field: 'minProgress',
         message: 'El mínimo queda más allá de la meta: ningún avance podría alcanzarlo.',
-        severity: 'warning',
+        severity: 'info',
       });
     }
   }
@@ -168,7 +168,7 @@ export function validateObjective(objective: ParsedObjective): RuleViolation[] {
         rule: 'R5',
         field: 'maxProgress',
         message: 'El máximo queda antes de la meta: el cumplimiento nunca llegaría al 100%.',
-        severity: 'warning',
+        severity: 'info',
       });
     }
   }
@@ -242,7 +242,7 @@ export function validateProgressUpdate(objective: ParsedObjective): RuleViolatio
         rule: 'AVANCE_RETROCEDE',
         field: 'newProgress',
         message: `El avance retrocede: pasa de ${currentProgress} a ${newProgress} en un objetivo de ${trend.toLowerCase()}.`,
-        severity: 'warning',
+        severity: 'info',
       });
     }
   }
@@ -257,7 +257,7 @@ export function validateProgressUpdate(objective: ParsedObjective): RuleViolatio
         rule: 'R4',
         field: 'newProgress',
         message: `Valor mínimo aceptable de avance es ${minProgress}, en caso de no alcanzarlo el cumplimiento será 0.`,
-        severity: 'warning',
+        severity: 'info',
       });
     }
   }
@@ -272,7 +272,7 @@ export function validateProgressUpdate(objective: ParsedObjective): RuleViolatio
         // de la meta, cumplir hasta el tope da más de 100% y eso es correcto.
         // Decir "se topa en 100%" sería mentir sobre lo que va a quedar guardado.
         message: `Valor máximo aceptable de avance es ${maxProgress}, en caso de superarlo el cumplimiento se ajusta al tope.`,
-        severity: 'warning',
+        severity: 'info',
       });
     }
   }

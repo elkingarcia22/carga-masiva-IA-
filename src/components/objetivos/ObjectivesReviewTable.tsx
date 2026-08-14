@@ -1201,6 +1201,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                                 onCancel: cancelDelete,
                               }}
                               isIdle={isConfirmingRowHere}
+                              isGroupConfirmed={group.reviewConfirmed}
                             />
                           ))}
 
@@ -1230,6 +1231,7 @@ export const ObjectivesReviewTable: React.FC<ObjectivesReviewTableProps> = ({
                               // No `removal`: these are not in the load, so there is
                               // nothing to take out of it.
                               isIdle={isConfirmingRowHere}
+                              isGroupConfirmed={group.reviewConfirmed}
                             />
                           ))}
                         </tbody>

@@ -99,7 +99,7 @@ interface ObjectiveRowChip {
    * table; painting the chip too would be the same fact in two places and a
    * third chip colour the other two operations never show.
    */
-  tone?: "warning" | "neutral";
+  tone?: "warning" | "neutral" | "info";
 }
 
 /**
@@ -132,9 +132,13 @@ const WEIGHT_TOTAL_MARK: RuleViolation = {
 /** A cell the rules flagged keeps its outline at rest — that is the exception. */
 function fieldStateClass(violations: RuleViolation[] | undefined): string {
   if (!violations || violations.length === 0) return "";
-  return violations.some((violation) => violation.severity === "error")
-    ? "border-status-negative/60 bg-status-negative/5 hover:border-status-negative"
-    : "border-status-warning/60 bg-status-warning/5 hover:border-status-warning";
+  if (violations.some((violation) => violation.severity === "error")) {
+    return "border-status-negative/60 bg-status-negative/5 hover:border-status-negative";
+  }
+  if (violations.some((violation) => violation.severity === "warning")) {
+    return "border-status-warning/60 bg-status-warning/5 hover:border-status-warning";
+  }
+  return "";
 }
 
 interface NumberCellProps {
@@ -385,6 +389,8 @@ export interface ObjectiveReviewRowProps {
   };
   /** Frozen and dimmed because another row of this card holds the open question. */
   isIdle: boolean;
+  /** Whether the parent group has already been confirmed by the user. */
+  isGroupConfirmed?: boolean;
 }
 
 export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
@@ -401,9 +407,11 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
   onChange,
   removal,
   isIdle,
+  isGroupConfirmed,
 }) => {
   const isSaved = objective.saved !== undefined;
   const isAdjusted = hasSavedEdits(objective);
+  const isRowPending = objective.link?.status === "possible";
   /**
    * Whether this row knows which objective it is about.
    *
@@ -465,7 +473,7 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
             objective.link.reason ??
             "Solo pudimos proponer a qué objetivo corresponde. Ábrelo para confirmarlo.",
           icon: <HelpCircle className="h-2.5 w-2.5" strokeWidth={2.5} />,
-          tone: "warning",
+          tone: isGroupConfirmed ? "info" : "warning",
         }
       : targetTitle !== undefined
         ? null
@@ -482,7 +490,7 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
               objective.link.reason ??
               "Solo pudimos proponer a qué objetivo corresponde. Ábrelo para confirmarlo.",
             icon: <HelpCircle className="h-2.5 w-2.5" strokeWidth={2.5} />,
-            tone: "warning",
+            tone: isGroupConfirmed ? "info" : "warning",
           }
         : targetTitle !== undefined
           ? {
@@ -645,7 +653,12 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
               value={objective.title}
               maxLength={400}
               onChange={(event) => onChange({ title: event.target.value })}
-              className={cn(QUIET_CELL, "font-semibold", fieldStateClass(byField.title))}
+              className={cn(
+                QUIET_CELL,
+                "font-semibold",
+                isRowPending && "border-border/50 bg-surface",
+                fieldStateClass(byField.title)
+              )}
             />
           )}
           {/* `mt-1` is not decoration: the name above is a control with its own
@@ -680,9 +693,11 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
                   "shrink-0 inline-flex items-center gap-1 pl-1.5 pr-2 py-0.5 rounded-full border text-[9.5px] font-bold whitespace-nowrap",
                   chip.tone === "warning"
                     ? "border-status-warning/60 bg-status-warning/10 text-status-warning"
-                    : chip.tone === "neutral"
-                      ? "border-black/10 bg-black/[0.06] text-text-primary/90"
-                      : "border-border/60 bg-surface text-text-secondary/65"
+                    : chip.tone === "info"
+                      ? "border-status-info/60 bg-status-info/10 text-status-info"
+                      : chip.tone === "neutral"
+                        ? "border-black/10 bg-black/[0.06] text-text-primary/90"
+                        : "border-border/60 bg-surface text-text-secondary/65"
                 )}
                 title={chip.hint}
               >
@@ -925,10 +940,14 @@ export const ObjectiveReviewRow: React.FC<ObjectiveReviewRowProps> = ({
                     "flex items-start gap-1.5 text-[11px] font-medium",
                     violation.severity === "error"
                       ? "text-status-negative"
-                      : "text-status-warning"
+                      : violation.severity === "warning"
+                        ? "text-status-warning"
+                        : "text-status-info"
                   )}
                 >
                   {violation.severity === "error" ? (
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" strokeWidth={2.5} />
+                  ) : violation.severity === "warning" ? (
                     <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" strokeWidth={2.5} />
                   ) : (
                     <Info className="h-3 w-3 mt-0.5 shrink-0" strokeWidth={2.5} />
